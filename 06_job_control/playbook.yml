@@ -1,0 +1,38 @@
+---
+- name: Task Failure Exercise
+  hosts: databases
+  gather_facts: false
+  vars:
+    web_package: httpd     # 잘못된 정보 그대로 입력
+    db_package: mariadb-server
+    db_service: mariadb
+  tasks:
+    - name: Check local time
+      ansible.builtin.command: date
+      register: command_result
+      changed_when: false
+
+    - name: Print local time
+      ansible.builtin.debug:
+        var: command_result.stdout
+
+    - name: Attepmt to set up a web server
+      block:
+        - name: Install {{ web_package }} package
+          ansible.builtin.dnf:
+            name: "{{ web_package }}"
+            state: present
+          #ignore_errors: yes
+          failed_when: web_package == "httpd"
+      
+      rescue:
+        - name: Install {{ db_package }} package
+          ansible.builtin.dnf:
+            name: "{{ db_package }}"
+            state: present
+
+      always:
+        - name: Start {{ db_service }} service
+          ansible.builtin.service:
+            name: "{{ db_service }}"
+            state: started

@@ -1,0 +1,56 @@
+---
+ ##############################
+# Play 01 - 웹 서버 구축
+# 1) 패키지 설치
+# 2) 서비스 설정
+# 3) 서비스 기동
+# 4) 방화벽에 등록
+# Play 02 - 웹 요청 확인
+##############################
+#
+# Play 01 - 웹 서버 설정
+#
+- name: Restore playbook.yml
+  hosts: all
+  vars_files:
+    - vars/vars.yml
+   
+  tasks:
+     
+    - name: 1) 방화벽 서비스 제거
+      ansible.posix.firewalld:
+        service: "{{ item }}"
+        state: disabled
+        immediate: true
+      loop:
+        - "{{ fw_80 }}"
+        - "{{ fw_8080 }}"
+
+    - name: 2) 웹서비스 종료 - "{{ svc_web }}", "{{ svc_fw }}"
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+      loop:
+        - "{{ svc_web }}"
+        - "{{ svc_fw }}"
+
+    - name: 3) 웹 서버 삭제 - /var/www/html/index.html
+      ansible.builtin.file:
+        path: "{{ inx_dest }}"
+        state: absent
+
+    # 1) 웹패키지 삭제 - httpd, mod_ssl, firewalld
+    - name: 1) 웹패키지 삭제
+      ansible.builtin.dnf:
+        name:
+          - "{{ pkg_http }}"
+          - "{{ pkg_https }}"
+          - "{{ pkg_fw }}"
+        state: absent
+   
+
+    
+    
+
+

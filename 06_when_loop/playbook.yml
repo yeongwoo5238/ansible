@@ -1,0 +1,31 @@
+---
+##########################
+# Play01 - DB 서비스 기동
+# 1) 패키지 설치 - mariadb-server, python3-PyMySQL
+# 2) 서비스 기동 - maraidb
+###########################
+- name: Play01 - DB 서비스 기동
+  hosts: database_dev
+  gather_facts: true
+  vars:
+    db_pkgs:
+      - mariadb
+      - mariadb-server
+      - python3-PyMySQL
+    db_svc: mariadb
+  tasks:
+    - name: 1) 패키지 설치 - mariadb, mariadb-server, python3-PyMySQL
+      ansible.builtin.dnf:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ db_pkgs }}"
+      when: ansible_facts['distribution'] == "RedHat"
+      #when: ansible_facts['distribution'] == "CentOS"
+
+
+    - name: 2) 서비스 기동 - mariadb
+      ansible.builtin.systemd_service:
+        name: "{{ db_svc }}"
+        state:  started
+        enabled: true
+        

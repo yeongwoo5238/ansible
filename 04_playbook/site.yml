@@ -1,0 +1,61 @@
+---
+#######################################
+    # 1) 패키지 설치 - httpd
+    # 2) 웹서버 설정 
+    #  - /etc/httpd/conf/httpd.conf, /etc/httpd/conf.d/*.conf
+    #  - /var/www/html/index.html
+    # 3) 웹서버 기동 - httpd.service
+    # 4) 방화벽 등록
+    # 5) SELinux(?)
+########################################
+- name: 0) 웹서버 설정
+  hosts: webservers
+  tasks:
+#- hosts: web1.example.com:web2.example.com  
+     # 1) 패키지 설치 - dnf(httpd)
+    - name: 1) 패키지 설치 - (yum,dnf) httpd, firewalld
+      ansible.builtin.dnf:
+        # yum install httpd firewalld
+        name:
+          - httpd
+          - firewalld
+        state: present
+
+    - name: 2) 웹 서버 설정 - (copy) /var/www/html/index.html
+      ansible.builtin.copy:
+        # scp files/index.html HOST:/var/www/html/index.html
+        src: files/index.html
+        dest: /var/www/html/index.html
+        mode: '0644'
+
+    - name: 3) 웹 서비스 기동 - (service,systemd) httpd.service
+      ansible.builtin.service:
+        # systemctl enable --now httpd.service
+        name: httpd
+        state: started
+        enabled: true
+
+    - name: 3) 방화벽 서비스 기동 - (service, systemd) firewalld.service
+      ansible.builtin.service:
+        # systemctl enable --now firewalld.service
+        name: firewalld
+        state: started
+        enabled: true
+
+    - name: 4) 방화벽에 등록 - (firewalld) http
+      ansible.posix.firewalld:
+        # firewall-cmd --permanent --add-service=http
+        # firewall-cmd --reload
+        service: http
+        permanent: true
+        immediate: true
+        state: enabled
+
+# yum install httpd
+#(ㄴ) 서비스 설정
+# cp files/index.html /var/www/html/index.html
+#(ㄷ) 서비스 기동
+# systemctl enable --now httpd
+#(ㄹ) 방화벽 기동 및 등록
+# firewall-cmd --permanent --add-service=http
+# firewall-cmd --reload

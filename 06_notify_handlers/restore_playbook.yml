@@ -1,0 +1,23 @@
+---
+- name: Restore playbook.yml
+  hosts: all
+  remote_user: root
+  gather_facts: false
+  tasks:
+    
+    - name: 1) DB 서비스 종료 - mariadb + notify
+      ansible.builtin.systemd_service:
+        name: mariadb
+        state: stopped
+        enabled: false
+      ignore_errors: true
+
+    - name: 2) DB 패키지 삭제 - mariadb, mariadb-server, python3-PyMySQL
+      ansible.builtin.dnf:
+        name:
+          - mariadb
+          - mariadb-server          # 오타 수정: maraidb-server -> mariadb-server
+          - python3-PyMySQL
+        state: absent
+
+     

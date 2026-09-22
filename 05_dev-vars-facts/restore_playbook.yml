@@ -1,0 +1,36 @@
+---
+##################
+# 3) 패키지 삭제
+# 2) 서비스 중지
+# 1) 방화벽 삭제
+##################
+
+- name: Restore playbook.yml
+  hosts: all
+  become: true
+  tasks:
+    - name: 1) 방화벽 포트제거 - "{{ ansible_local['custom']['general']['fwsvc'] }}"
+      ansible.posix.firewalld:
+        service: "{{ ansible_local['custom']['general']['fwsvc'] }}"
+        state: disabled
+        permanent: true
+        immediate: true
+  
+
+    - name: 2) 서비스 중지
+      ansible.builtin.systemd_service:
+        name: "{{ ansible_local['custom']['general']['service'] }}"
+        state: stopped
+        enabled: false
+  
+  
+  
+    - name: 3) 패키지 삭제 - httpd
+      ansible.builtin.dnf:
+        name: "{{ ansible_local['custom']['general']['package'] }}"
+        state: absent
+
+    
+    
+
+   

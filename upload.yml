@@ -1,0 +1,72 @@
+---
+- name: Push local code to GitHub via Ansible
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_prompt:
+    - name: github_token
+      prompt: "GitHub Token을 입력하세요"
+      private: true  # 입력할 때 글자가 화면에 보이지 않음
+
+  vars:
+    repo_dir: "."
+    github_url: "https://{{ github_token }}@github.com/yeongwoo5238/ansible.git"
+    git_user_name: "yeongwoo5238"
+    git_user_email: "damenke19@gmail.com"
+    commit_msg: "Initial commit via Ansible"
+    target_branch: "main"
+
+  tasks:
+    - name: 1. git init (로컬 저장소 초기화)
+      ansible.builtin.command: git init
+      args:
+        chdir: "{{ repo_dir }}"
+        creates: "{{ repo_dir }}/.git"
+
+    - name: 2. git config 유저 설정
+      ansible.builtin.command: "git config user.name '{{ git_user_name }}'"
+      args:
+        chdir: "{{ repo_dir }}"
+
+    - name: 3. git config 이메일 설정
+      ansible.builtin.command: "git config user.email '{{ git_user_email }}'"
+      args:
+        chdir: "{{ repo_dir }}"
+
+    - name: 4. git remote 연결 (GitHub 원격 주소 등록)
+      ansible.builtin.shell: |
+        git remote remove origin 2>/dev/null || true
+        git remote add origin {{ github_url }}
+      args:
+        chdir: "{{ repo_dir }}"
+      no_log: true  # 토큰 노출 방지
+
+    - name: 5. git add (모든 파일 스테이징, .gitignore는 자동 제외)
+      ansible.builtin.command: git add -A
+      args:
+        chdir: "{{ repo_dir }}"
+
+    - name: 6. git commit (변경사항이 있을 때만 커밋)
+      ansible.builtin.shell: |
+        if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+          git commit -m "{{ commit_msg }}"
+        fi
+      args:
+        chdir: "{{ repo_dir }}"
+
+    - name: 7. 기본 브랜치 이름을 main으로 설정
+      ansible.builtin.command: "git branch -M {{ target_branch }}"
+      args:
+        chdir: "{{ repo_dir }}"
+
+    - name: 8. git push (GitHub에 올리기)
+      ansible.builtin.command: "git push -u origin {{ target_branch }}"
+      args:
+        chdir: "{{ repo_dir }}"
+      no_log: true  # 에러 시 토큰 노출 방지
+
+    - name: 9. 보안 정리 (.git 설정에서 토큰 흔적 제거)
+      ansible.builtin.command: "git remote set-url origin https://github.com/yeongwoo5238/ansible.git"
+      args:
+        chdir: "{{ repo_dir }}"

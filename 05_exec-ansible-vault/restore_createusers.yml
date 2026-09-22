@@ -1,0 +1,16 @@
+---
+- name: Restore createuser.yml
+  hosts: devservers
+  remote_user: devops
+  become: true
+  vars_files:
+    - vars/secret1.yml
+    - vars/secret2.yml
+    - vars/secret3.yml
+  tasks:
+    - name: 1) 시크릿 파일을 사용한 사용자 삭제
+      ansible.builtin.user:
+        name: "{{ item.name }}"
+        state: absent
+        remove: true
+      loop: "{{ newusers1 + newusers2 + newusers3 }}"

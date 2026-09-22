@@ -1,0 +1,31 @@
+---
+#################################
+# 1) 사용자 추가 및 암호 설정 - devops/soldesk1.
+# 2) /etc/sudoers.d/devops
+# 3) $HOME/.ssh/authorized_keys
+#################################
+- name: 0) 사용자 추가 - devops
+  hosts: all
+  remote_user: ansible
+  vars:
+    username: devops
+    pwhash: soldesk1.
+  tasks:
+    - name: 1) 사용자 추가 및 암호 설정
+      ansible.builtin.user:
+        name: "{{ username }}"
+        password: "{{ pwhash | password_hash('sha512') }}"
+
+    - name: 2) 파일 배포 - /etc/sudoers.d/devops
+      ansible.builtin.copy:
+        src: files/devops
+        dest: /etc/sudoers.d/devops
+        mode: '0644'
+
+    - name: 3) SSH Public Key 배포
+      ansible.posix.authorized_key:
+        user: devops
+        state: present
+        #key: "{{ lookup('file', '/home/ansible/.ssh/id_ed25519.pub') }}“
+        key: "{{ lookup('file', '/home/ansible/.ssh/id_rsa.pub') }}"
+

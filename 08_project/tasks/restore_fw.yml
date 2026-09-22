@@ -1,0 +1,15 @@
+---
+# Task File:
+- name: 방화벽 포트 제거 - {{ rules }}
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    permanent: true
+    immediate: true
+    state: disabled
+  loop: "{{ rules }}"
+
+- name: 방화벽 서비스 종료 - {{ service }}
+  ansible.builtin.systemd:
+    name: "{{ service }}"
+    enabled: false
+    state: stopped

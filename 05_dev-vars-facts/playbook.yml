@@ -1,0 +1,31 @@
+---
+##################
+# 1) 패키지 설치
+# 2) 서비스 기동
+# 3) 방화벽 등록
+##################
+
+- name: Play01 - 웹서버 설정
+  hosts: webservers
+  become: true
+  tasks:
+  # 1) 패키지 설치
+    - name: 1) 패키지 설치 - httpd
+      ansible.builtin.dnf:
+        name: "{{ ansible_local['custom']['general']['package'] }}"
+        state: present
+
+    # 2) 서비스 기동
+    - name: 2) 서비스 기동
+      ansible.builtin.systemd_service:
+        name: "{{ ansible_local['custom']['general']['service'] }}"
+        state: "{{ ansible_local['custom']['general']['state'] }}"
+        enabled: true
+
+    # 3) 방화벽 등록
+    - name: 3) 방화벽 등록 - "{{ ansible_local['custom']['general']['fwsvc'] }}"
+      ansible.posix.firewalld:
+        service: "{{ ansible_local['custom']['general']['fwsvc'] }}"
+        state: enabled
+        permanent: true
+        immediate: true

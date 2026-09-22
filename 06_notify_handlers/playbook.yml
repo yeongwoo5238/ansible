@@ -1,0 +1,58 @@
+---
+###################################
+# Play01 - Mariadb 설정
+# 1) DB 패키지 설치
+# 2) DB 서비스 기동
+#    ->  mysql_secure_installation/mariadb-secure-installation
+# 3) /etc/my.cnf 파일 다운로드
+#    -> 서비스 재기동
+###################################
+- name: Play01 - Mariadb 설정
+  hosts: databases
+  remote_user: root
+  gather_facts: false
+  tasks:
+    - name: 1) DB 패키지 설치 - mariadb, mariadb-server, python3-PyMySQL
+      ansible.builtin.dnf:
+        name:
+          - mariadb
+          - mariadb-server          # 오타 수정: maraidb-server -> mariadb-server
+          - python3-PyMySQL
+        state: present
+
+    - name: 2) DB 서비스 기동 - mariadb + notify
+      ansible.builtin.systemd_service:
+        name: mariadb
+        state: started
+        enabled: true
+      notify: set db password
+
+    - name: /etc/my.cnf 파일 다운로드
+      ansible.builtin.get_url:
+        url: http://192.168.10.10/my.cnf.standard
+        dest: /etc/my.cnf
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart db service     # 모듈(ansible.builtin.get_url)과 동일한 열로 들여쓰기 위치 조정
+
+  handlers:
+    - name: set db password
+      community.mysql.mysql_user:    # 환경에 따라 ansible.mysql.mysql_user 또는 community.mysql.mysql_user 사용
+        name: root
+        host: localhost
+        password: soldesk1.
+        state: present
+        priv: '*.*:ALL'
+        login_user: root
+        login_password: 'soldesk1.'
+        login_unix_socket: /var/lib/mysql/mysql.sock
+
+    - name: restart db service
+      ansible.builtin.systemd_service:
+        name: mariadb
+        state: restarted
+
+
+
+

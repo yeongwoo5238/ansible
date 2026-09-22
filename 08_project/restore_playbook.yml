@@ -1,0 +1,22 @@
+---
+- name: Restore playbook.yml
+  hosts: all
+  tasks:
+    - name: 1) 웹서버 서비스 종료 및 패키지 삭제
+      ansible.builtin.include_tasks: tasks/restore_web.yml
+      vars:
+        packages:
+          - httpd
+          - mod_ssl
+        service: httpd
+        files:
+          - /var/www/html/index.html
+
+    - name: 2) 방화벽 포트 제거 및 서비스 중지
+      ansible.builtin.import_tasks: tasks/restore_fw.yml
+      vars:
+        packages: firewalld
+        service: firewalld
+        rules:
+          - http
+          - https

@@ -1,0 +1,10 @@
+- name: Fact Dump
+  hosts: localhost
+  tasks:
+    - name: Gathering all facts
+      ansible.builtin.setup:
+      register: facts
+
+    - name: Print all facts
+      ansible.builtin.debug:
+        var: facts
