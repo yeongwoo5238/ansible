@@ -1,0 +1,54 @@
+---
+############################################################
+# 타겟(target) 변경
+# 요구사항:
+# * 현재 기본 systemd 부팅 타겟을 가져오고 
+# * output 이라는 변수에 출력을 등록하는 작업을 추가한다.
+# * 기본 systemd 타겟을 graphical.target으로 설정하지 않은 경우
+# * 이를 설정하는 작업을 추가한다.
+############################################################
+- name: 타겟 변경
+  hosts: webservers
+  become: true
+  vars:
+    default_target: "multi-user.target"
+    #default_target: "graphical.target"    
+  tasks:
+    - name: 현재 기본 systemd 부팅 타겟 가져오기
+      ansible.builtin.command:
+        cmd: systemctl get-default
+      changed_when: false
+      register: output1
+
+    - name: 기본 systemd 타겟을 {{ default_target }}으로 설정
+      ansible.builtin.command:
+        cmd: systemctl set-default {{ default_target }}
+      when:  default_target not in output1["stdout"]
+      changed_when: true
+      register: output_set_default
+
+    # - name: 기본 systemd 타겟을 {{ default_target }}으로 설정
+    #   ansible.builtin.file:
+    #     src: /usr/lib/systemd/system/{{ default_target }}
+    #     dest: /etc/systemd/system/default.target
+    #     state: link
+    #     force: true
+    #   when:  default_target not in output["stdout"]
+    #   changed_when: true
+
+    - name: 재부팅
+      ansible.builtin.reboot:
+        reboot_timeout: 300
+      #when: output_set_default is changed
+
+    - name: 현재 기본 systemd 부팅 타겟 가져오기
+      ansible.builtin.command:
+        cmd: systemctl get-default
+      changed_when: false
+      register: output2
+
+    - name: 기본 systemd 타겟 확인
+      ansible.builtin.debug:
+        msg: |
+          "OLD Target - {{ output1.stdout }}"
+          "NEW Target - {{ output2.stdout }}"

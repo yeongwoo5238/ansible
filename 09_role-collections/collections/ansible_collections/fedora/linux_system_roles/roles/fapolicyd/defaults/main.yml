@@ -1,0 +1,30 @@
+---
+# NB. Supported RHEL versions: RHEL 8+
+#
+# Enable or disable service after configuration
+# to allow testing and verification before use.
+# NB. See ima_evm_setup if planning to use IMA.
+fapolicyd_setup_enable_service: true
+
+# trust list for fapolicyd configuration file
+# null means use the platform-specific default (see set_vars.yml)
+# effective default "rpmdb,file" on EL < 8.3, empty string on newer systems
+fapolicyd_setup_trust: null
+
+# set integrity
+# null means use the platform-specific default (see set_vars.yml)
+# can be "none", "size", "sha256", "ima"
+# in case of ima, kernel's IMA has to be setup correctly
+# effective default "none" on EL < 8.4, empty string on newer systems
+fapolicyd_setup_integrity: null
+
+# set permissive mode
+fapolicyd_setup_permissive: false
+
+# fapolicyd trust path management
+# list of trusted files and directories
+# Prefer fapolicyd_add_trusted_paths; fapolicyd_add_trusted_file is kept for
+# compatibility and is used when fapolicyd_add_trusted_paths is not set
+# null means use the platform-specific default (see set_vars.yml)
+fapolicyd_add_trusted_file: null
+fapolicyd_add_trusted_paths: "{{ fapolicyd_add_trusted_file }}"

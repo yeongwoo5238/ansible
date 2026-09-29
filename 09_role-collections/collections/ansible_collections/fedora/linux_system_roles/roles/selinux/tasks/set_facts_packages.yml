@@ -1,0 +1,18 @@
+---
+- name: Ensure ansible_facts used by role
+  setup:
+    gather_subset: "{{ __selinux_required_facts_subsets }}"
+  when: __selinux_required_facts | difference(ansible_facts.keys() | list) | length > 0
+
+- name: Record role begin fingerprint
+  fedora.linux_system_roles.sr_fingerprint:
+    status: begin
+    role_name: selinux
+    role_path: "{{ role_path }}"
+    ansible_play_hosts_all: "{{ ansible_play_hosts_all }}"
+    distribution: "{{ ansible_facts['distribution'] }}"
+    distribution_version: "{{ ansible_facts['distribution_version'] }}"
+    write_log_file: "{{ __selinux_write_log_file }}"
+
+- name: Ensure SELinux packages
+  include_tasks: ensure_selinux_packages.yml

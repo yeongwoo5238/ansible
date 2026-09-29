@@ -1,0 +1,48 @@
+---
+- name: CentOS Stream 10 NIC 본딩(Bonding) 및 상세 옵션 구성
+  hosts: servers
+  become: true
+  gather_facts: true
+
+  vars:
+    network_connections:
+      # 1. Bond 마스터 인터페이스 설정
+      - name: bond0
+        interface_name: bond0
+        type: bond
+        state: present
+        autoconnect: true
+        ip:
+          address:
+            - "192.168.10.22/24"
+        bond:
+          mode: active-backup
+          miimon: 100
+          downdelay: 0
+          updelay: 0
+          primary: ens160
+          fail_over_mac: active
+
+      # 2. Slave 인터페이스 1 (ens256)
+      - name: bond0-port1
+        interface_name: ens256
+        type: ethernet
+        controller: bond0
+        port_type: bond
+        state: present
+        autoconnect: true
+
+      # 3. Slave 인터페이스 2 (ens224)
+      - name: bond0-port2
+        interface_name: ens224
+        type: ethernet
+        controller: bond0
+        port_type: bond
+        state: present
+        autoconnect: true
+
+  tasks:
+    - name: 네트워크 시스템 역할 실행
+      ansible.builtin.include_role:
+        name: redhat.rhel_system_roles.network
+

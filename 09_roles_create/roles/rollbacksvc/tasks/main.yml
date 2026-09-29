@@ -1,0 +1,35 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for rollbacksvc
+################################
+# 1) 방화벽 포트 제거 - ex) http, https
+# 2) 서비스 종료 - ex) httpd, firewalld
+# 3) 디렉토리/파일 삭제 - ex) /var/www/html/index.html, ...
+# 4) 패키지 삭제 - ex) httpd, mod_ssl
+################################
+- name: 1) 방화벽 포트 제거
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    state: disabled
+    permanent: true
+    immediate: true
+  loop: "{{ fw_svcs }}"
+  ignore_errors: true
+
+- name: 2) 서비스 종료
+  ansible.builtin.service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  loop: "{{ svcs }}"
+
+- name: 3) 디렉토리/파일 삭제
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ myfiles }}"
+
+- name: 4) 패키지 삭제
+  ansible.builtin.dnf:
+    name: "{{ pkgs }}"
+    state: absent

@@ -1,0 +1,172 @@
+# SPDX-License-Identifier: MIT
+---
+# Verify meta/argument_specs.yml and tasks/assert_role_vars.yml reject bad
+# parameters.  Each block runs the role expecting failure; rescue records
+# that outcome.
+- name: Verify invalid parameters are rejected
+  hosts: all
+  tasks:
+    - name: Run invalid input tests
+      block:
+      # ====================================================
+      # Section 1: argument_specs validation (Ansible 2.10+)
+      # ====================================================
+
+        - name: Run argument specs validation tests
+          when: ansible_version.full is version('2.11', '>=')
+          block:
+          # --- Test: non-boolean trustee_server_trustee ---
+            - name: Argument specs reject non-boolean trustee_server_trustee
+              block:
+                - name: Run role with non-boolean trustee_server_trustee
+                  ansible.builtin.include_tasks:
+                    file: tasks/run_role_with_clear_facts.yml
+                  vars:
+                    trustee_server_trustee: not_a_bool
+              rescue:
+                - name: Mark invalid trustee_server_trustee type rejected
+                  ansible.builtin.set_fact:
+                    __invalid_input_trustee_type_failed: true
+
+            - name: Assert invalid trustee_server_trustee type was rejected
+              ansible.builtin.assert:
+                that:
+                  - __invalid_input_trustee_type_failed | default(false)
+                fail_msg: >-
+                  meta/argument_specs should reject
+                  trustee_server_trustee values that are not booleans
+
+          # --- Test: non-boolean trustee_server_secret_registration_enabled ---
+            - name: Argument specs reject non-boolean secret_registration_enabled
+              block:
+                - name: Run role with non-boolean secret_registration_enabled
+                  ansible.builtin.include_tasks:
+                    file: tasks/run_role_with_clear_facts.yml
+                  vars:
+                    trustee_server_secret_registration_enabled: not_a_bool
+              rescue:
+                - name: Mark invalid secret_registration_enabled type rejected
+                  ansible.builtin.set_fact:
+                    __invalid_input_secret_reg_enabled_type_failed: true
+
+            - name: Assert invalid secret_registration_enabled type was rejected
+              ansible.builtin.assert:
+                that:
+                  - >-
+                    __invalid_input_secret_reg_enabled_type_failed
+                    | default(false)
+                fail_msg: >-
+                  meta/argument_specs should reject
+                  trustee_server_secret_registration_enabled values that
+                  are not booleans
+
+          # --- Test: non-integer secret_registration_listen_port ---
+            - name: Argument specs reject non-integer listen_port
+              block:
+                - name: Run role with non-integer listen_port
+                  ansible.builtin.include_tasks:
+                    file: tasks/run_role_with_clear_facts.yml
+                  vars:
+                    trustee_server_secret_registration_listen_port: not_an_int
+              rescue:
+                - name: Mark invalid listen_port type rejected
+                  ansible.builtin.set_fact:
+                    __invalid_input_listen_port_type_failed: true
+
+            - name: Assert invalid listen_port type was rejected
+              ansible.builtin.assert:
+                that:
+                  - >-
+                    __invalid_input_listen_port_type_failed
+                    | default(false)
+                fail_msg: >-
+                  meta/argument_specs should reject
+                  trustee_server_secret_registration_listen_port values
+                  that are not integers
+
+          # --- Test: non-boolean trustee_server_secure_logging ---
+            - name: Argument specs reject non-boolean secure_logging
+              block:
+                - name: Run role with non-boolean secure_logging
+                  ansible.builtin.include_tasks:
+                    file: tasks/run_role_with_clear_facts.yml
+                  vars:
+                    trustee_server_secure_logging: not_a_bool
+              rescue:
+                - name: Mark invalid secure_logging type rejected
+                  ansible.builtin.set_fact:
+                    __invalid_input_secure_logging_type_failed: true
+
+            - name: Assert invalid secure_logging type was rejected
+              ansible.builtin.assert:
+                that:
+                  - >-
+                    __invalid_input_secure_logging_type_failed
+                    | default(false)
+                fail_msg: >-
+                  meta/argument_specs should reject
+                  trustee_server_secure_logging values that are not
+                  booleans
+
+      # ====================================================
+      # Section 2: assert_role_vars validation (all versions)
+      # ====================================================
+
+      # --- Test: listen_port above valid range ---
+        - name: Assert rejects listen_port above 65535
+          block:
+            - name: Run role with listen_port 70000
+              ansible.builtin.include_tasks:
+                file: tasks/run_role_with_clear_facts.yml
+              vars:
+                trustee_server_secret_registration_listen_port: 70000
+          rescue:
+            - name: Mark listen_port above range rejected
+              ansible.builtin.set_fact:
+                __invalid_input_listen_port_high_failed: true
+
+        - name: Assert listen_port above 65535 was rejected
+          ansible.builtin.assert:
+            that:
+              - >-
+                __invalid_input_listen_port_high_failed
+                | default(false)
+            fail_msg: >-
+              tasks/assert_role_vars.yml should reject
+              trustee_server_secret_registration_listen_port when it
+              is above 65535
+
+      # --- Test: listen_port below valid range ---
+        - name: Assert rejects listen_port below 1
+          block:
+            - name: Run role with listen_port 0
+              ansible.builtin.include_tasks:
+                file: tasks/run_role_with_clear_facts.yml
+              vars:
+                trustee_server_secret_registration_listen_port: 0
+          rescue:
+            - name: Mark listen_port below range rejected
+              ansible.builtin.set_fact:
+                __invalid_input_listen_port_low_failed: true
+
+        - name: Assert listen_port below 1 was rejected
+          ansible.builtin.assert:
+            that:
+              - >-
+                __invalid_input_listen_port_low_failed
+                | default(false)
+            fail_msg: >-
+              tasks/assert_role_vars.yml should reject
+              trustee_server_secret_registration_listen_port when it
+              is below 1
+
+      always:
+        - name: Clear test facts
+          ansible.builtin.set_fact:
+            __invalid_input_trustee_type_failed: null
+            __invalid_input_secret_reg_enabled_type_failed: null
+            __invalid_input_listen_port_type_failed: null
+            __invalid_input_secure_logging_type_failed: null
+            __invalid_input_listen_port_high_failed: null
+            __invalid_input_listen_port_low_failed: null
+          tags: tests::cleanup

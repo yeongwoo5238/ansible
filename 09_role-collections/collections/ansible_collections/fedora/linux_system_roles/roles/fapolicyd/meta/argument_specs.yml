@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: MIT
+---
+argument_specs:
+  main:
+    short_description: The fapolicyd role.
+    description: >
+      The fapolicyd role allows you to configure the file access policy
+      daemon (fapolicyd) on RHEL 8.1+ and Fedora systems. It manages
+      service state, trust sources, integrity checking, permissive mode,
+      and trusted file entries.
+    options:
+      fapolicyd_setup_enable_service:
+        type: bool
+        default: true
+        description: >
+          Whether to start and enable the fapolicyd service after
+          configuration. When `false`, the service is stopped and
+          disabled.
+      fapolicyd_setup_trust:
+        type: str
+        default: null
+        description: >
+          Comma-separated list of trust sources for fapolicyd.
+          Valid sources are `rpmdb`, `file`, and `deb` (if compiled
+          with Debian support). An empty string means the trust
+          option is not configured. A `null` value selects the
+          platform-specific setting: `rpmdb,file` on EL < 8.3,
+          or an empty string on newer systems.
+      fapolicyd_setup_integrity:
+        type: str
+        default: null
+        choices:
+          - ""
+          - null
+          - none
+          - size
+          - sha256
+          - ima
+        description: >
+          The integrity checking method for fapolicyd (`none`,
+          `size`, `sha256`, or `ima`). Note that `ima` requires
+          the kernel IMA subsystem to be set up separately. An
+          empty string means the integrity option is not configured.
+          A `null` value selects the platform-specific setting:
+          `none` on EL < 8.4, or an empty string on newer systems.
+      fapolicyd_setup_permissive:
+        type: bool
+        default: false
+        description: >
+          Whether to deploy fapolicyd in permissive mode. When `true`,
+          fapolicyd logs policy violations but does not enforce them.
+      fapolicyd_add_trusted_file:
+        type: raw
+        default: null
+        description: >
+          Files to add to the fapolicyd trust database. Accepts a
+          single file path as a string or a list of file paths. An
+          empty string or empty list means no files are added. A
+          `null` value selects the platform-specific setting: an
+          empty list on EL < 8.4, or an empty string on newer
+          systems. Deprecated in favor of
+          `fapolicyd_add_trusted_paths`.
+      fapolicyd_add_trusted_paths:
+        type: raw
+        default: null
+        description: >
+          Files and directories to add to the fapolicyd trust
+          database. Accepts a single path as a string or a list
+          of paths. An empty string or empty list means no paths
+          are added. A `null` value inherits the resolved value
+          of `fapolicyd_add_trusted_file`.

@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: MIT
+---
+# Put internal variables here with Red Hat Enterprise Linux 9 specific values.
+
+__postgresql_packages: >-
+  {{ ['@postgresql:' + (__postgresql_version | string) +
+       '/server'] if (__postgresql_version | string) != '13' else
+       ['postgresql-server'] }}

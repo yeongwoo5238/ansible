@@ -1,0 +1,27 @@
+---
+- name: Ensure ansible_facts used by role
+  setup:
+    gather_subset: "{{ __journald_required_facts_subsets }}"
+  when: __journald_required_facts | difference(ansible_facts.keys() | list) | length > 0
+
+- name: Record role begin fingerprint
+  fedora.linux_system_roles.sr_fingerprint:
+    status: begin
+    role_name: journald
+    role_path: "{{ role_path }}"
+    ansible_play_hosts_all: "{{ ansible_play_hosts_all }}"
+    distribution: "{{ ansible_facts['distribution'] }}"
+    distribution_version: "{{ ansible_facts['distribution_version'] }}"
+    write_log_file: "{{ __journald_write_log_file }}"
+
+- name: Determine if system is ostree and set flag
+  when: not __journald_is_ostree is defined
+  block:
+    - name: Check if system is ostree
+      stat:
+        path: /run/ostree-booted
+      register: __ostree_booted_stat
+
+    - name: Set flag to indicate system is ostree
+      set_fact:
+        __journald_is_ostree: "{{ __ostree_booted_stat.stat.exists }}"

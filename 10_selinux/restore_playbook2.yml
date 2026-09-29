@@ -1,0 +1,73 @@
+---
+- name: SELinux WEB 실습 환경 원복
+  hosts: webservers
+  become: true
+
+  tasks:
+    # --------------------------------------------------
+    # 1. SELinux 로컬 설정 원복
+    #    Boolean, File Context, Port의 이번 실습 설정을 제거
+    # --------------------------------------------------
+    - name: SELinux 설정 원복
+      ansible.builtin.include_role:
+        name: rhel-system-roles.selinux
+      vars:
+        selinux_booleans:
+          - name: httpd_can_network_connect
+            state: false
+            persistent: false
+
+        selinux_fcontexts:
+          - target: '/www(/.*)?'
+            setype: httpd_sys_content_t
+            state: absent
+
+        selinux_ports:
+          - ports: 8888
+            proto: tcp
+            setype: http_port_t
+            state: absent
+
+        selinux_restore_dirs:
+          - /www
+    # --------------------------------------------------
+    # 2. 방화벽 8888/tcp 규칙 제거
+    # --------------------------------------------------
+    #- name: 방화벽 설정 제거 - 8888/tcp
+    #  ansible.posix.firewalld:
+    #    port: 8888/tcp
+    #    permanent: true
+    #    immediate: true
+    #    state: disabled
+
+    # --------------------------------------------------
+    # 3. WEB 서비스 중지 및 부팅 시 자동 시작 해제
+    # --------------------------------------------------
+    - name: WEB 서비스 중지 및 자동 시작 해제
+      ansible.builtin.systemd:
+        #name: "{{ item }}"
+        name: httpd
+        state: stopped
+        enabled: false
+      #loop:
+      #  - httpd
+      #  - firewalld
+
+    # --------------------------------------------------
+    # 4. WEB 디렉토리 및 파일 제거
+    # --------------------------------------------------
+    - name: WEB 디렉토리 제거 - /www
+      ansible.builtin.file:
+        path: /www
+        state: absent
+
+    # --------------------------------------------------
+    # 5. WEB 패키지 제거
+    # --------------------------------------------------
+    - name: WEB 패키지 제거
+      ansible.builtin.dnf:
+        name:
+          - httpd
+          - mod_ssl
+          #- firewalld
+        state: absent

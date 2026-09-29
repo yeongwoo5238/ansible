@@ -1,0 +1,14 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for rollbacksvc
+fw_svcs:
+  - http
+  - https
+
+svcs:
+  - httpd
+  - firewalld
+
+pkgs:
+  - httpd
+  - mod_ssl

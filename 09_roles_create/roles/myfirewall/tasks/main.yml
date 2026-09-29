@@ -1,0 +1,28 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for myfirewall
+##############################
+# 1) 패키지 설치 - firewalld
+# 2) 서비스 기동 - firewalld.service
+# 3) 방화벽 서비스 등록 - http, https
+##############################
+- name: 1) 패키지 설치 - firewalld
+  ansible.builtin.dnf:
+    name: firewalld
+    state: present
+
+- name: 2) 서비스 기동 - firewalld.service
+  ansible.builtin.systemd_service:
+    name: firewalld
+    state: started
+    enabled: true
+
+
+- name: 3) 방화벽 서비스 등록 - http, https
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ ports }}"
+

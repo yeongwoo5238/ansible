@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: MIT
+---
+# tasks file for nbde_server.
+
+# yamllint disable rule:line-length
+- name: Set version specific variables
+  include_tasks: set_vars.yml
+
+- name: Include the appropriate provider tasks
+  include_tasks: main-{{ nbde_server_provider }}.yml
+
+- name: Record role success fingerprint
+  fedora.linux_system_roles.sr_fingerprint:
+    status: success
+    role_name: nbde_server
+    role_path: "{{ role_path }}"
+    ansible_play_hosts_all: "{{ ansible_play_hosts_all }}"
+    distribution: "{{ ansible_facts['distribution'] }}"
+    distribution_version: "{{ ansible_facts['distribution_version'] }}"
+    write_log_file: "{{ __nbde_server_write_log_file }}"
+
+# vim:set ts=2 sw=2 et:

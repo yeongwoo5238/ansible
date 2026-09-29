@@ -1,0 +1,123 @@
+---
+- name: Validate role parameters
+  ansible.builtin.include_tasks: assert_role_vars.yml
+
+- name: Set platform/version specific variables
+  include_tasks: set_vars.yml
+
+- name: Install session recording packages
+  package:
+    name: "{{ __tlog_packages }}"
+    use: "{{ (__tlog_is_ostree | d(false)) | ternary('ansible.posix.rhel_rpm_ostree', omit) }}"
+
+- name: Get the rpm package facts
+  package_facts: null
+  no_log: "{{ ansible_verbosity < 2 }}"
+
+- name: Install cockpit session recording
+  package:
+    name: "{{ __tlog_cockpit_packages }}"
+    use: "{{ (__tlog_is_ostree | d(false)) | ternary('ansible.posix.rhel_rpm_ostree', omit) }}"
+  when:
+    - "'cockpit' in ansible_facts.packages"
+
+# include_ini_file.yml selects the vendored (python < 3.7) or
+# community.general.ini_file module; values are passed as __tlog_ini_file_* vars.
+- name: Configure sssd services section
+  include_tasks: include_ini_file.yml
+  vars:
+    __tlog_ini_file_path: "{{ __tlog_sssd_conf }}"
+    __tlog_ini_file_section: sssd
+    __tlog_ini_file_option: "{{ item.key }}"
+    __tlog_ini_file_value: "{{ item.value }}"
+    __tlog_ini_file_create: true
+    __tlog_ini_file_owner: root
+    __tlog_ini_file_group: root
+    __tlog_ini_file_mode: "0600"
+  loop:
+    - key: services
+      value: "nss, pam"
+    - key: domains
+      value: "nssfiles"
+  when:
+    - tlog_use_sssd | bool
+    - "'sssd' in ansible_facts.packages"
+
+- name: Configure sssd proxy provider domain
+  include_tasks: include_ini_file.yml
+  vars:
+    __tlog_ini_file_path: "{{ __tlog_sssd_conf }}"
+    __tlog_ini_file_section: domain/nssfiles
+    __tlog_ini_file_option: "{{ item.key }}"
+    __tlog_ini_file_value: "{{ item.value }}"
+    __tlog_ini_file_create: true
+    __tlog_ini_file_owner: root
+    __tlog_ini_file_group: root
+    __tlog_ini_file_mode: "0600"
+  loop:
+    - key: id_provider
+      value: proxy
+    - key: proxy_lib_name
+      value: files
+    - key: proxy_pam_target
+      value: sssd-shadowutils
+  when:
+    - tlog_use_sssd | bool
+    - "'sssd' in ansible_facts.packages"
+
+- name: Configure sssd session recording config
+  template:
+    src: sssd-session-recording.conf
+    dest: "{{ __tlog_sssd_session_recording_conf }}"
+    owner: root
+    group: sssd
+    mode: "0640"
+  when: tlog_use_sssd
+  notify: Handler tlog_handler restart sssd
+
+- name: Check appropriate authselect features exists
+  command: authselect list-features sssd
+  register: __tlog_authselect_features
+  changed_when: false
+
+- name: Enable authselect profile with tlog feature
+  command: authselect select sssd with-tlog --force
+  changed_when: true
+  when:
+    - not ansible_check_mode
+    - tlog_use_sssd | bool
+    - '"with-tlog" in __tlog_authselect_features.stdout'
+
+- name: Check which authselect features are currently enabled
+  command: authselect current
+  register: __tlog_authselect_current
+  changed_when: false
+  failed_when: __tlog_authselect_current.rc not in [0, 2]
+
+- name: Update nsswitch
+  command: authselect select sssd with-files-domain --force
+  when:
+    - not ansible_check_mode
+    - tlog_use_sssd
+    - '"with-files-domain" in __tlog_authselect_features.stdout'
+    - not "with-files-domain" in __tlog_authselect_current.stdout
+  notify: Handler tlog_handler restart sssd
+  changed_when: true
+
+- name: Configure tlog rec session
+  template:
+    src: tlog-rec-session.conf
+    dest: "{{ __tlog_rec_session_conf }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Record role success fingerprint
+  fedora.linux_system_roles.sr_fingerprint:
+    status: success
+    role_name: tlog
+    role_path: "{{ role_path }}"
+    ansible_play_hosts_all: "{{ ansible_play_hosts_all }}"
+    distribution: "{{ ansible_facts['distribution'] }}"
+    distribution_version: "{{ ansible_facts['distribution_version'] }}"
+    write_log_file: "{{ __tlog_write_log_file }}"

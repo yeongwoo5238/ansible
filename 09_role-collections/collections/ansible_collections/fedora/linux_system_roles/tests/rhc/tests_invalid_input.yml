@@ -1,0 +1,366 @@
+# SPDX-License-Identifier: MIT
+---
+- name: Verify invalid parameters are rejected
+  hosts: all
+  tasks:
+    - name: Run invalid input tests
+      block:
+      # ====================================================
+      # Section 1: Verify role works with valid parameters
+      # ====================================================
+        - name: Run role with valid parameters
+          ansible.builtin.include_tasks: tasks/run_role_with_clear_facts.yml
+          vars:
+            rhc_state: absent
+
+        - name: Check subscription-manager registration status
+          ansible.builtin.command:
+            argv:
+              - subscription-manager
+              - identity
+          register: __rhc_identity_after_absent
+          changed_when: false
+          failed_when: false
+
+        - name: Assert system is disconnected from Red Hat
+          ansible.builtin.assert:
+            that:
+              - __rhc_identity_after_absent.rc != 0
+            fail_msg: >-
+              rhc_state absent should leave the system unregistered
+
+      # ====================================================
+      # Section 2: argument_specs validation (Ansible 2.11+)
+      # ====================================================
+        - name: Run argument specs validation tests
+          when: ansible_version.full is version("2.11", ">=")
+          block:
+            - name: Argument specs reject missing required repository name
+              block:
+                - name: Run role without required repository name
+                  ansible.builtin.include_tasks: tasks/run_role_with_clear_facts.yml
+                  vars:
+                    rhc_state: absent
+                    rhc_repositories:
+                      - state: enabled
+              rescue:
+                - name: Mark missing repository name rejected
+                  ansible.builtin.set_fact:
+                    __invalid_input_missing_repo_name_failed: true
+                  when: >-
+                    'missing required arguments' in
+                    (ansible_failed_result | default({}) | to_json)
+
+            - name: Assert missing repository name was rejected
+              ansible.builtin.assert:
+                that:
+                  - __invalid_input_missing_repo_name_failed | default(false)
+                fail_msg: >-
+                  argument_specs should reject rhc_repositories entries
+                  missing the required name field
+
+            - name: Argument specs reject non-string rhc_state
+              block:
+                - name: Run role with non-string rhc_state
+                  ansible.builtin.include_tasks: tasks/run_role_with_clear_facts.yml
+                  vars:
+                    rhc_state: 123
+              rescue:
+                - name: Mark invalid rhc_state type rejected
+                  ansible.builtin.set_fact:
+                    __invalid_input_rhc_state_type_failed: true
+
+            - name: Assert invalid rhc_state type was rejected
+              ansible.builtin.assert:
+                that:
+                  - __invalid_input_rhc_state_type_failed | default(false)
+                fail_msg: >-
+                  argument_specs should reject rhc_state with type int
+
+            - name: Argument specs reject invalid rhc_state choice
+              block:
+                - name: Run role with invalid rhc_state value
+                  ansible.builtin.include_tasks: tasks/run_role_with_clear_facts.yml
+                  vars:
+                    rhc_state: invalid_choice
+              rescue:
+                - name: Mark invalid rhc_state choice rejected
+                  ansible.builtin.set_fact:
+                    __invalid_input_rhc_state_choice_failed: true
+
+            - name: Assert invalid rhc_state choice was rejected
+              ansible.builtin.assert:
+                that:
+                  - __invalid_input_rhc_state_choice_failed | default(false)
+                fail_msg: >-
+                  argument_specs should reject rhc_state value
+                  'invalid_choice'
+
+            - name: Argument specs reject invalid rhc_insights.state choice
+              block:
+                - name: Run role with invalid rhc_insights.state value
+                  ansible.builtin.include_tasks: tasks/run_role_with_clear_facts.yml
+                  vars:
+                    rhc_state: absent
+                    rhc_insights:
+                      state: invalid_choice
+              rescue:
+                - name: Mark invalid rhc_insights.state choice rejected
+                  ansible.builtin.set_fact:
+                    __invalid_input_rhc_insights_state_choice_failed: true
+
+            - name: Assert invalid rhc_insights.state choice was rejected
+              ansible.builtin.assert:
+                that:
+                  - >-
+                    __invalid_input_rhc_insights_state_choice_failed
+                    | default(false)
+                fail_msg: >-
+                  argument_specs should reject rhc_insights.state value
+                  'invalid_choice'
+
+            - name: Argument specs reject invalid repository state choice
+              block:
+                - name: Run role with invalid repository state value
+                  ansible.builtin.include_tasks: tasks/run_role_with_clear_facts.yml
+                  vars:
+                    rhc_state: absent
+                    rhc_repositories:
+                      - name: test-repo
+                        state: invalid_choice
+              rescue:
+                - name: Mark invalid repository state choice rejected
+                  ansible.builtin.set_fact:
+                    __invalid_input_repo_state_choice_failed: true
+
+            - name: Assert invalid repository state choice was rejected
+              ansible.builtin.assert:
+                that:
+                  - __invalid_input_repo_state_choice_failed | default(false)
+                fail_msg: >-
+                  argument_specs should reject rhc_repositories state value
+                  'invalid_choice'
+
+            - name: Argument specs reject non-boolean rhc_insights.autoupdate
+              block:
+                - name: Run role with non-boolean rhc_insights.autoupdate
+                  ansible.builtin.include_tasks: tasks/run_role_with_clear_facts.yml
+                  vars:
+                    rhc_state: absent
+                    rhc_insights:
+                      autoupdate: not_a_bool
+              rescue:
+                - name: Mark invalid rhc_insights.autoupdate type rejected
+                  ansible.builtin.set_fact:
+                    __invalid_input_autoupdate_type_failed: true
+
+            - name: Assert invalid rhc_insights.autoupdate type was rejected
+              ansible.builtin.assert:
+                that:
+                  - __invalid_input_autoupdate_type_failed | default(false)
+                fail_msg: >-
+                  argument_specs should reject rhc_insights.autoupdate
+                  with type str
+
+      # ====================================================
+      # Section 3: assert_role_vars validation (all versions)
+      # ====================================================
+        - name: Assert rejects rhc_release as a list
+          block:
+            - name: Run role with rhc_release as a list
+              ansible.builtin.include_tasks: tasks/run_role_with_clear_facts.yml
+              vars:
+                rhc_state: absent
+                rhc_release:
+                  - "8.6"
+          rescue:
+            - name: Mark rhc_release list rejected
+              ansible.builtin.set_fact:
+                __invalid_input_rhc_release_list_failed: true
+
+        - name: Assert rhc_release as list was rejected
+          ansible.builtin.assert:
+            that:
+              - __invalid_input_rhc_release_list_failed | default(false)
+            fail_msg: >-
+              assert_role_vars should reject rhc_release when given
+              a list value
+
+        - name: Assert rejects rhc_baseurl as an integer
+          block:
+            - name: Run role with rhc_baseurl as an integer
+              ansible.builtin.include_tasks: tasks/run_role_with_clear_facts.yml
+              vars:
+                rhc_state: absent
+                rhc_baseurl: 123
+          rescue:
+            - name: Mark rhc_baseurl integer rejected
+              ansible.builtin.set_fact:
+                __invalid_input_rhc_baseurl_int_failed: true
+
+        - name: Assert rhc_baseurl as integer was rejected
+          ansible.builtin.assert:
+            that:
+              - __invalid_input_rhc_baseurl_int_failed | default(false)
+            fail_msg: >-
+              assert_role_vars should reject rhc_baseurl when given
+              an integer value
+
+        - name: Assert rejects rhc_insights.tags as a string
+          block:
+            - name: Run role with rhc_insights.tags as a string
+              ansible.builtin.include_tasks: tasks/run_role_with_clear_facts.yml
+              vars:
+                rhc_state: absent
+                rhc_insights:
+                  tags: not_a_dict
+          rescue:
+            - name: Mark rhc_insights.tags string rejected
+              ansible.builtin.set_fact:
+                __invalid_input_rhc_insights_tags_str_failed: true
+
+        - name: Assert rhc_insights.tags as string was rejected
+          ansible.builtin.assert:
+            that:
+              - >-
+                __invalid_input_rhc_insights_tags_str_failed
+                | default(false)
+            fail_msg: >-
+              assert_role_vars should reject rhc_insights.tags when given
+              a string value
+
+        - name: Assert rejects rhc_insights.ansible_host as an integer
+          block:
+            - name: Run role with rhc_insights.ansible_host as an integer
+              ansible.builtin.include_tasks: tasks/run_role_with_clear_facts.yml
+              vars:
+                rhc_state: absent
+                rhc_insights:
+                  ansible_host: 123
+          rescue:
+            - name: Mark rhc_insights.ansible_host integer rejected
+              ansible.builtin.set_fact:
+                __invalid_input_rhc_insights_ansible_host_int_failed: true
+
+        - name: Assert rhc_insights.ansible_host as integer was rejected
+          ansible.builtin.assert:
+            that:
+              - >-
+                __invalid_input_rhc_insights_ansible_host_int_failed
+                | default(false)
+            fail_msg: >-
+              assert_role_vars should reject rhc_insights.ansible_host
+              when given an integer value
+
+        - name: Assert rejects rhc_auth with both login and activation_keys
+          block:
+            - name: Run role with conflicting rhc_auth methods
+              ansible.builtin.include_tasks: tasks/run_role_with_clear_facts.yml
+              vars:
+                rhc_state: absent
+                rhc_auth:
+                  login:
+                    username: user
+                    password: pass
+                  activation_keys:
+                    keys:
+                      - key-1
+          rescue:
+            - name: Mark conflicting rhc_auth methods rejected
+              ansible.builtin.set_fact:
+                __invalid_input_rhc_auth_both_methods_failed: true
+
+        - name: Assert conflicting rhc_auth methods were rejected
+          ansible.builtin.assert:
+            that:
+              - __invalid_input_rhc_auth_both_methods_failed | default(false)
+            fail_msg: >-
+              assert_role_vars should reject rhc_auth when both login and
+              activation_keys are specified
+
+        - name: Assert rejects activation_keys without rhc_organization
+          block:
+            - name: Run role with activation_keys but no organization
+              ansible.builtin.include_tasks: tasks/run_role_with_clear_facts.yml
+              vars:
+                rhc_state: present
+                rhc_auth:
+                  activation_keys:
+                    keys:
+                      - key-1
+          rescue:
+            - name: Mark activation_keys without organization rejected
+              ansible.builtin.set_fact:
+                __invalid_input_activation_keys_no_org_failed: true
+
+        - name: Assert activation_keys without organization was rejected
+          ansible.builtin.assert:
+            that:
+              - __invalid_input_activation_keys_no_org_failed | default(false)
+            fail_msg: >-
+              assert_role_vars should reject activation_keys when
+              rhc_organization is not set
+
+        - name: Assert rejects empty activation_keys without rhc_organization
+          block:
+            - name: Run role with empty activation_keys and reconnect
+              ansible.builtin.include_tasks: tasks/run_role_with_clear_facts.yml
+              vars:
+                rhc_state: reconnect
+                rhc_auth:
+                  activation_keys: {}
+          rescue:
+            - name: Mark empty activation_keys without organization rejected
+              ansible.builtin.set_fact:
+                __invalid_input_activation_keys_empty_no_org_failed: true
+
+        - name: Assert empty activation_keys without organization was rejected
+          ansible.builtin.assert:
+            that:
+              - >-
+                __invalid_input_activation_keys_empty_no_org_failed
+                | default(false)
+            fail_msg: >-
+              assert_role_vars should reject activation_keys when
+              rhc_organization is not set, even if keys is empty
+
+        - name: Assert rejects rhc_proxy state absent with extra fields
+          block:
+            - name: Run role with rhc_proxy state absent and hostname
+              ansible.builtin.include_tasks: tasks/run_role_with_clear_facts.yml
+              vars:
+                rhc_state: absent
+                rhc_proxy:
+                  state: absent
+                  hostname: proxy.example.com
+          rescue:
+            - name: Mark rhc_proxy absent with extra fields rejected
+              ansible.builtin.set_fact:
+                __invalid_input_rhc_proxy_absent_extra_failed: true
+
+        - name: Assert rhc_proxy absent with extra fields was rejected
+          ansible.builtin.assert:
+            that:
+              - __invalid_input_rhc_proxy_absent_extra_failed | default(false)
+            fail_msg: >-
+              assert_role_vars should reject rhc_proxy when state is absent
+              and other proxy fields are specified
+
+      always:
+        - name: Clear test facts
+          ansible.builtin.set_fact:
+            __invalid_input_missing_repo_name_failed: null
+            __invalid_input_rhc_state_type_failed: null
+            __invalid_input_rhc_state_choice_failed: null
+            __invalid_input_rhc_insights_state_choice_failed: null
+            __invalid_input_repo_state_choice_failed: null
+            __invalid_input_autoupdate_type_failed: null
+            __invalid_input_rhc_release_list_failed: null
+            __invalid_input_rhc_baseurl_int_failed: null
+            __invalid_input_rhc_insights_tags_str_failed: null
+            __invalid_input_rhc_insights_ansible_host_int_failed: null
+            __invalid_input_rhc_auth_both_methods_failed: null
+            __invalid_input_activation_keys_no_org_failed: null
+            __invalid_input_activation_keys_empty_no_org_failed: null
+            __invalid_input_rhc_proxy_absent_extra_failed: null
+          tags: tests::cleanup

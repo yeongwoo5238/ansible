@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT
+---
+# Two tasks are needed due to how 'removes' works:
+# * if ALL files in 'removes' exist, the command is run
+# * if only one exists, the command is skipped.
+# When a cluster has never started, there is no cib.xml, yet we still want to
+# run 'pcs cluster destroy'.
+
+- name: Remove cluster configuration
+  ansible.builtin.command:
+    cmd: pcs cluster destroy
+    removes: "{{ config_file }}"
+  loop:
+    - /etc/corosync/corosync.conf
+    - /var/lib/pacemaker/cib/cib.xml
+  loop_control:
+    loop_var: config_file

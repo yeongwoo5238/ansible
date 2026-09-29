@@ -1,0 +1,8 @@
+#SPDX-License-Identifier: MIT-0
+---
+# handlers file for roles/myvhost
+- name: restart httpd
+  ansible.builtin.systemd:
+    name: httpd
+    state: restarted
+

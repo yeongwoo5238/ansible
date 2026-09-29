@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: MIT
+---
+# Here is the right place to put the role's input variables.
+# This file also serves as a documentation for such a variables.
+
+# Examples of role input variables:
+postgresql_version: null
+postgresql_password: null
+postgresql_cert_name: null
+# the container build environment's RAM is independent from the deployment
+# (regardless if it's a bootc or system container one), so disable tuning there
+# by default
+postgresql_server_tuning: null
+postgresql_ssl_enable: false
+
+# If you want to generate the certificas in the postgresql role
+# specify the configuration like this example
+# postgresql_certificates:
+#   - name: postgresql_cert
+#     dns: ['localhost', 'www.example.com']
+#     ca: self-sign
+postgresql_certificates: []
+postgresql_secure_logging: true
+
+__postgresql_write_log_file: false

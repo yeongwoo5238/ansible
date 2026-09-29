@@ -1,0 +1,23 @@
+---
+- name: Print that the sshd variable is deprecated
+  when: sshd is defined
+  ansible.builtin.debug:
+    msg: >-
+      The sshd variable is deprecated and will be removed
+      in a future version. Edit your playbook to use
+      the sshd_config variable instead.
+
+- name: Invoke the role, if enabled
+  ansible.builtin.include_tasks: sshd.yml
+  when: sshd_enable|bool
+
+- name: Record role success fingerprint
+  fedora.linux_system_roles.sr_fingerprint:
+    status: success
+    role_name: willshersystems:ansible-sshd
+    role_path: "{{ role_path }}"
+    ansible_play_hosts_all: "{{ ansible_play_hosts_all }}"
+    distribution: "{{ ansible_facts['distribution'] }}"
+    distribution_version: "{{ ansible_facts['distribution_version'] }}"
+    write_log_file: "{{ __sshd_write_log_file }}"
+  when: sshd_enable|bool and sshd_enable_fingerprint|bool

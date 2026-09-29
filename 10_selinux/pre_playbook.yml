@@ -1,0 +1,74 @@
+---
+- name: SELinux 관리
+  hosts: webservers
+  become: true
+  tasks:
+    - name: SELinux 모드 설정
+      ansible.posix.selinux:
+        policy: targeted
+        state: enforcing
+
+    - name: WEB 패키지 설치
+      ansible.builtin.dnf:
+        name: httpd
+        state: present
+    
+    - name: WEB 서비스 설정 - httpd.conf
+      ansible.builtin.copy:
+        #src: /home/ansible/10_selinux/files/httpd.conf
+        src: ./files/httpd.conf
+        dest: /etc/httpd/conf/httpd.conf
+        owner: root
+        group: root
+        mode: '0644'
+    
+    - name: WEB 디렉토리 생성 - /www
+      ansible.builtin.file:
+        path: /www
+        state: directory
+
+    - name: WEB 서비스 설정 - index.html
+      ansible.builtin.copy:
+        #src: /home/ansible/10_selinux/files/index.html
+        src: ./files/index.html
+        dest: /www/index.html
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: WEB 서비스가 네트워크 연결 가능하도록 boolean 설정
+      ansible.posix.seboolean:
+        name: httpd_can_network_connect
+        state: true
+        persistent: true
+    
+    - name: 웹루트 디렉토리 fcontext 설정
+      #ansible.posix.sefcontext:
+      community.general.sefcontext:
+        target: '/www(/.*)?'
+        setype: httpd_sys_content_t
+        state: present
+
+    - name: 웹루트 디렉토리 fcontext 적용
+      ansible.builtin.command:
+        cmd: restorecon -Rv /www
+
+    - name: SELinux Port 설정
+      #ansible.posix.seport:
+      community.general.seport:
+        ports: 8888
+        proto: tcp
+        setype: http_port_t
+        state: present
+
+    - name: WEB 서비스 시작 및 부팅 시 자동 시작 설정
+      ansible.builtin.systemd:
+        name: httpd
+        state: started
+
+    - name: 방화벽 설정 - http 서비스 허용
+      ansible.posix.firewalld:
+        port: 8888/tcp
+        permanent: true
+        state: enabled
+        immediate: true

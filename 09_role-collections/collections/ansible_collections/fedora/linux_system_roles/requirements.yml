@@ -1,0 +1,10 @@
+---
+# fedora.linux_system_roles still supports EL7, which limits dependency collection versions.
+# Ansible allows only one version per dependency; you cannot pin different versions
+# for different managed hosts.
+# If you do not need to manage EL7 hosts, you may force-install dependencies at the
+# latest versions instead of the ones listed below.
+collections:
+  - name: ansible.posix
+  - name: community.general
+  - name: containers.podman

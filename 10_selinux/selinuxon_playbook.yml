@@ -1,0 +1,9 @@
+---
+- name: 모든 시스템 SELinux 모드 설정
+  hosts: mysystems
+  become: true
+  tasks:
+    - name: SELinux 모드 설정
+      ansible.posix.selinux:
+        policy: targeted
+        state: enforcing

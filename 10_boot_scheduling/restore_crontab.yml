@@ -1,0 +1,12 @@
+---
+- name: Restore crontab.yml
+  hosts: webservers
+  become: true
+  tasks:
+    - name: Crontab 작업 추가
+      ansible.builtin.cron:
+        name: "나의 cron 작업이당"
+        job: date >> /tmp/mydate.txt
+        user: devops
+        cron_file: add-date-file
+        state: absent

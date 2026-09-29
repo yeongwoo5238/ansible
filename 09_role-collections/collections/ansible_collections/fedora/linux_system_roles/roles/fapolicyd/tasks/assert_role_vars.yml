@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: MIT
+---
+- name: Assert fapolicyd_add_trusted_file is a string or list of strings
+  ansible.builtin.assert:
+    that:
+      - >-
+        fapolicyd_add_trusted_file is string
+        or (fapolicyd_add_trusted_file is sequence
+            and fapolicyd_add_trusted_file is not string
+            and fapolicyd_add_trusted_file is not mapping
+            and fapolicyd_add_trusted_file | reject('string') | list
+            | length == 0)
+    fail_msg: >-
+      fapolicyd_add_trusted_file must be a string or list of strings,
+      got {{ fapolicyd_add_trusted_file | type_debug }}
+  when: fapolicyd_add_trusted_file is not none
+
+- name: Assert fapolicyd_add_trusted_paths is a string or list of strings
+  ansible.builtin.assert:
+    that:
+      - >-
+        fapolicyd_add_trusted_paths is string
+        or (fapolicyd_add_trusted_paths is sequence
+            and fapolicyd_add_trusted_paths is not string
+            and fapolicyd_add_trusted_paths is not mapping
+            and fapolicyd_add_trusted_paths | reject('string') | list
+            | length == 0)
+    fail_msg: >-
+      fapolicyd_add_trusted_paths must be a string or list of strings,
+      got {{ fapolicyd_add_trusted_paths | type_debug }}
+  when: fapolicyd_add_trusted_paths is not none

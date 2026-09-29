@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: MIT
+---
+argument_specs:
+  main:
+    short_description: The trustee_server role.
+    description: >
+      The trustee_server role deploys Trustee server components for
+      confidential computing. Trustee provides attestation and secret
+      delivery services (KBS, AS, RVPS) for workloads running in
+      Trusted Execution Environments using Podman Quadlets.
+
+      The role can optionally deploy a secret registration HTTPS
+      service that receives attestation-backed registration requests,
+      verifies attestation, creates disk encryption keys, and stores
+      them in Trustee KBS.
+    options:
+      trustee_server_trustee:
+        type: bool
+        default: true
+        description: >
+          Whether to deploy the Trustee server components (KBS, AS,
+          RVPS) using Podman Quadlets. The secret registration server
+          is only deployed when this is `true` and
+          `trustee_server_secret_registration_enabled` is also `true`.
+      trustee_server_secret_registration_enabled:
+        type: bool
+        default: false
+        description: >
+          Whether to deploy the secret registration HTTPS service
+          that receives attestation-backed registration requests,
+          verifies attestation, creates disk encryption keys, and
+          stores them in Trustee KBS. Has no effect unless
+          `trustee_server_trustee` is `true`.
+      trustee_server_secret_registration_listen_port:
+        type: int
+        default: 8081
+        description: >
+          TCP port on which the secret registration server listens.
+          The role opens this port in firewalld. Must be between
+          `1` and `65535` inclusive.
+      trustee_server_secure_logging:
+        type: bool
+        default: true
+        description: >
+          Whether to suppress potentially sensitive output from tasks
+          that handle credentials and secrets by setting `no_log` on
+          those tasks. Only intended to be disabled when debugging
+          credential or secret handling issues.

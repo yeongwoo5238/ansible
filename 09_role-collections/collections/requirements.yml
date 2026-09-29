@@ -1,0 +1,5 @@
+---
+collections:
+  - name: community.crypto
+
+  - name: http://ansible.example.com/fedora-linux_system_roles-2.5.0.tar.gz

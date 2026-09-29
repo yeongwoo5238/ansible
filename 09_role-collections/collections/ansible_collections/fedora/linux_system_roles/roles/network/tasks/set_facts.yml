@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: BSD-3-Clause
+---
+- name: Ensure ansible_facts used by role are present
+  setup:
+    gather_subset: "{{ __network_required_facts_subsets }}"
+  when: __network_required_facts | difference(ansible_facts.keys() | list) | length > 0
+  no_log: "{{ ansible_verbosity < 3 }}"
+
+- name: Record role begin fingerprint
+  fedora.linux_system_roles.sr_fingerprint:
+    status: begin
+    role_name: network
+    role_path: "{{ role_path }}"
+    ansible_play_hosts_all: "{{ ansible_play_hosts_all }}"
+    distribution: "{{ ansible_facts['distribution'] }}"
+    distribution_version: "{{ ansible_facts['distribution_version'] }}"
+    write_log_file: "{{ __network_write_log_file }}"
+
+- name: Determine if system is ostree and set flag
+  when: not __network_is_ostree is defined
+  block:
+    - name: Check if system is ostree
+      stat:
+        path: /run/ostree-booted
+      register: __ostree_booted_stat
+
+    - name: Set flag to indicate system is ostree
+      set_fact:
+        __network_is_ostree: "{{ __ostree_booted_stat.stat.exists }}"
+
+- name: Check which services are running
+  service_facts: null
+  no_log: "{{ ansible_verbosity < 3 }}"
+
+# needed for ansible_facts.packages
+- name: Check which packages are installed
+  package_facts: null
+  no_log: "{{ ansible_verbosity < 3 }}"

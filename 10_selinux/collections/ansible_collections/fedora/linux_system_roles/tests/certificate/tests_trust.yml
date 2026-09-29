@@ -1,0 +1,219 @@
+# SPDX-License-Identifier: MIT
+---
+- name: Test adding certificates to the system trust store
+  hosts: all
+  vars:
+    __sr_public: true
+    __trust_test_ca_cert: "{{ __trust_test_ca_tempdir.path }}/ca.crt"
+    __trust_test_ca_key: "{{ __trust_test_ca_tempdir.path }}/ca.key"
+    __certificate_trust_src:
+      - name: lsr-trust-test-src
+        src: "{{ __trust_test_ca_cert }}"
+        remote_src: true
+    __certificate_trust_content:
+      - name: lsr-trust-test-content
+        content: "{{ __trust_test_ca_slurp.content | b64decode }}"
+    __certificate_trust_absent:
+      - name: lsr-trust-test-src
+        state: absent
+      - name: lsr-trust-test-content
+        state: absent
+  tasks:
+    - name: Run certificate_trust tests
+      block:
+        - name: Create a temporary directory for the test CA certificate
+          tempfile:
+            prefix: lsr_trust_test_
+            state: directory
+          register: __trust_test_ca_tempdir
+
+        - name: Get var __certificate_is_ostree and other role vars
+          include_role:
+            name: fedora.linux_system_roles.certificate
+            tasks_from: set_vars.yml
+            public: true
+
+        - name: Ensure openssl is installed
+          package:
+            name: openssl
+            state: present
+            use: "{{ (__certificate_is_ostree | d(false)) | ternary('ansible.posix.rhel_rpm_ostree', omit) }}"
+
+        - name: Generate a self-signed test CA certificate
+          command: >-
+            openssl req -x509 -new -newkey rsa:2048 -nodes -days 3650
+            -subj /CN=LSR-Trust-Test-CA
+            -keyout {{ __trust_test_ca_key }}
+            -out {{ __trust_test_ca_cert }}
+          changed_when: true
+
+        - name: Check that the test CA certificate is not yet trusted
+          command: openssl verify {{ __trust_test_ca_cert }}
+          register: __trust_verify_before
+          changed_when: false
+          failed_when: false
+
+        - name: Assert that the test CA certificate is not yet trusted
+          assert:
+            that: "__trust_verify_before.stdout is not search(': OK')"
+
+        - name: Trust a certificate file on the managed host
+          vars:
+            certificate_trust: "{{ __certificate_trust_src }}"
+          block:
+            - name: Run the role to trust a certificate file on the managed host
+              include_tasks: tasks/run_role_with_clear_facts.yml
+              vars:
+                __sr_public: true
+
+            - name: Check idempotency if system is booted
+              when: __certificate_is_booted
+              block:
+                - name: Run the role again to test idempotency
+                  include_tasks: tasks/run_role_with_clear_facts.yml
+
+                - name: Assert no changes were made
+                  assert:
+                    that: not certificate_is_changed
+                    fail_msg: "Certificate was changed when it should not have been"
+
+        - name: Get the trust anchor file attributes
+          stat:
+            path: "{{ __certificate_trust_dir }}/lsr-trust-test-src.crt"
+          register: __trust_anchor
+
+        - name: Assert that the trust anchor was installed
+          assert:
+            that:
+              - __trust_anchor.stat.exists
+              - __trust_anchor.stat.mode == '0644'
+              - __trust_anchor.stat.pw_name == 'root'
+              - __trust_anchor.stat.gr_name == 'root'
+
+        - name: Check that the test CA certificate is now trusted
+          command: openssl verify {{ __trust_test_ca_cert }}
+          register: __trust_verify_after
+          changed_when: false
+          failed_when: "__trust_verify_after.stdout is not search(': OK')"
+
+        - name: Slurp the test CA certificate
+          slurp:
+            path: "{{ __trust_test_ca_cert }}"
+          register: __trust_test_ca_slurp
+
+        - name: Trust inline certificate content
+          vars:
+            certificate_trust: "{{ __certificate_trust_content }}"
+          block:
+            - name: Run the role to trust inline certificate content
+              include_tasks: tasks/run_role_with_clear_facts.yml
+              vars:
+                __sr_public: true
+
+            - name: Check idempotency if system is booted
+              when: __certificate_is_booted
+              block:
+                - name: Run the role again to test idempotency
+                  include_tasks: tasks/run_role_with_clear_facts.yml
+
+                - name: Assert no changes were made
+                  assert:
+                    that: not certificate_is_changed
+                    fail_msg: "Certificate was changed when it should not have been"
+
+        - name: Get the trust anchor file attributes
+          stat:
+            path: "{{ __certificate_trust_dir }}/lsr-trust-test-content.crt"
+          register: __trust_anchor_content
+
+        - name: Assert that the trust anchor was installed
+          assert:
+            that:
+              - __trust_anchor_content.stat.exists
+              - __trust_anchor_content.stat.mode == '0644'
+              - __trust_anchor_content.stat.pw_name == 'root'
+              - __trust_anchor_content.stat.gr_name == 'root'
+
+        - name: Verify that conflicting certificate sources fail validation
+          vars:
+            certificate_trust:
+              - name: lsr-trust-test-invalid
+                content: not-a-certificate
+                url: https://ca.example.com/ca.crt
+          block:
+            - name: Run the role with conflicting certificate sources
+              include_tasks: tasks/run_role_with_clear_facts.yml
+
+            - name: Failed
+              fail:
+                msg: Role did not fail with conflicting certificate sources
+          rescue:
+            - name: Assert that the role failed in validation
+              assert:
+                that: >-
+                  ansible_failed_result | to_json is
+                  search('exactly one of content, src, or url')
+                fail_msg: >-
+                  The role failed for an unexpected reason:
+                  {{ ansible_failed_result }}
+
+        - name: Remove the trust anchors
+          vars:
+            certificate_trust: "{{ __certificate_trust_absent }}"
+          block:
+            - name: Run the role to remove the trust anchors
+              include_tasks: tasks/run_role_with_clear_facts.yml
+              vars:
+                __sr_public: true
+
+            - name: Check idempotency if system is booted
+              when: __certificate_is_booted
+              block:
+                - name: Run the role again to test idempotency
+                  include_tasks: tasks/run_role_with_clear_facts.yml
+
+                - name: Assert no changes were made
+                  assert:
+                    that: not certificate_is_changed
+                    fail_msg: "Certificate was changed when it should not have been"
+
+        - name: Get the trust anchor file attributes
+          stat:
+            path: "{{ __certificate_trust_dir }}/{{ item }}.crt"
+          loop:
+            - lsr-trust-test-src
+            - lsr-trust-test-content
+          register: __trust_anchors_removed
+
+        - name: Assert that the trust anchors were removed
+          assert:
+            that: not item.stat.exists
+          loop: "{{ __trust_anchors_removed.results }}"
+          loop_control:
+            label: "{{ item.item }}"
+
+        - name: Check that the test CA certificate is no longer trusted
+          command: openssl verify {{ __trust_test_ca_cert }}
+          register: __trust_verify_removed
+          changed_when: false
+          failed_when: false
+
+        - name: Assert that the test CA certificate is no longer trusted
+          assert:
+            that: "__trust_verify_removed.stdout is not search(': OK')"
+      always:
+        - name: Run the role to clean up the trust anchors
+          include_tasks: tasks/run_role_with_clear_facts.yml
+          vars:
+            __sr_failed_when: false
+            certificate_trust: "{{ __certificate_trust_absent }}"
+          tags: tests::cleanup
+
+        - name: Clean up the test CA temporary directory
+          file:
+            path: "{{ __trust_test_ca_tempdir.path }}"
+            state: absent
+          when:
+            - __trust_test_ca_tempdir is defined
+            - __trust_test_ca_tempdir.path is defined
+          tags: tests::cleanup

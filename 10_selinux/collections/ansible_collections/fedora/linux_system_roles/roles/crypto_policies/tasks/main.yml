@@ -1,0 +1,139 @@
+# SPDX-License-Identifier: MIT
+---
+- name: Set platform/version specific variables
+  include_tasks: set_vars.yml
+
+- name: Ensure required packages are installed
+  package:
+    name: "{{ __crypto_policies_packages }}"
+    state: present
+    use: "{{ (__crypto_policies_is_ostree | d(false)) | ternary('ansible.posix.rhel_rpm_ostree', omit) }}"
+  register: crypto_policies_package_result
+
+- name: Handle reboot for transactional update systems
+  when:
+    - __crypto_policies_is_transactional | d(false)
+    - crypto_policies_package_result is changed
+  block:
+    - name: Notify user that reboot is needed to apply changes
+      debug:
+        msg: >
+          Reboot required to apply changes due to transactional updates.
+
+    - name: Reboot transactional update systems
+      reboot:
+        msg: Rebooting the system to apply transactional update changes.
+      when: crypto_policies_transactional_update_reboot_ok | bool
+
+    - name: Fail if reboot is needed and not set
+      fail:
+        msg: >
+          Reboot is required but not allowed. Please set
+          'crypto_policies_transactional_update_reboot_ok' to proceed.
+      when:
+        - crypto_policies_transactional_update_reboot_ok is none
+
+- name: Gather facts
+  include_tasks: gather_facts.yml
+
+- name: Find base policies files
+  find:
+    paths:
+      - /usr/share/crypto-policies/policies/
+      - /etc/crypto-policies/policies/
+    patterns: '*.pol'
+  register: __crypto_policies_base_policies
+
+- name: Set available base policies fact
+  set_fact:
+    crypto_policies_available_policies: >-
+      {{ __crypto_policies_base_policies.files | map(attribute='path')
+        | map('basename') | map('splitext') | map('first') | unique | list }}
+    cacheable: true
+
+- name: Find subpolicy files
+  find:
+    paths:
+      - /usr/share/crypto-policies/policies/modules/
+      - /etc/crypto-policies/policies/modules/
+    patterns: '*.pmod'
+  register: __crypto_policies_subpolicies
+
+- name: Set available subpolicies fact
+  set_fact:
+    crypto_policies_available_subpolicies: >-
+      {{ __crypto_policies_subpolicies.files | map(attribute='path')
+        | map('basename') | map('splitext') | map('first') | unique | list }}
+    cacheable: true
+
+- name: Set crypto_policies_available_modules fact (deprecated)
+  set_fact:
+    crypto_policies_available_modules: >-
+      {{ crypto_policies_available_subpolicies }}
+    cacheable: true
+
+- name: Update crypto policy if needed
+  command: >
+    update-crypto-policies
+      {{ '--no-reload' if not crypto_policies_reload else '' }}
+      --set {{ crypto_policies_policy }}
+  when:
+  # TODO check with available policies and subpolicies
+    - crypto_policies_policy is not none
+    - crypto_policies_policy != crypto_policies_active
+  changed_when: true
+  notify: __crypto_policies_handler_modified
+  register: __crypto_policies_update_policy
+
+- name: Regenerate crypto policy when update was not needed
+  when: __crypto_policies_update_policy is skipped
+  block:
+    - name: Check if update-crypto-policies supports --check
+      command: update-crypto-policies --help
+      register: __crypto_policies_update_help
+      changed_when: false
+
+    - name: Check whether configured policy matches generated policy
+      command: update-crypto-policies --check
+      register: __crypto_policies_check
+      changed_when: false
+      failed_when: false
+      when: "'--check' in __crypto_policies_update_help.stdout"
+
+    - name: Regenerate crypto policy if needed
+      command: update-crypto-policies
+      when:
+        - >-
+          crypto_policies_force_regenerate | bool
+          or (
+            __crypto_policies_check is defined
+            and not __crypto_policies_check.skipped | default(false)
+            and __crypto_policies_check.rc | d(0) == 1
+            and (
+              "The configured policy does NOT match the generated policy"
+              in __crypto_policies_check.stderr | d("")
+            )
+          )
+      changed_when: true
+      register: __crypto_policies_regenerate_policy
+      notify: __crypto_policies_handler_modified
+
+- name: Set the reboot_required flag if needed
+  set_fact:
+    crypto_policies_reboot_required: true
+  when:
+  # TODO check with available policies and subpolicies
+    - (__crypto_policies_regenerate_policy is defined and __crypto_policies_regenerate_policy is changed) or (__crypto_policies_update_policy is defined and __crypto_policies_update_policy is changed)
+
+- name: Update facts after applying policy
+  include_tasks: gather_facts.yml
+
+- name: Record role success fingerprint
+  fedora.linux_system_roles.sr_fingerprint:
+    status: success
+    role_name: crypto_policies
+    role_path: "{{ role_path }}"
+    ansible_play_hosts_all: "{{ ansible_play_hosts_all }}"
+    distribution: "{{ ansible_facts['distribution'] }}"
+    distribution_version: "{{ ansible_facts['distribution_version'] }}"
+    write_log_file: "{{ __crypto_policies_write_log_file }}"

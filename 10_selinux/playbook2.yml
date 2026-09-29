@@ -1,0 +1,105 @@
+---
+- name: SELinux 관리
+  hosts: webservers
+  become: true
+
+  vars:
+
+    # --------------------------------------------------
+    # SELinux 설정
+    # --------------------------------------------------
+    selinux_state: enforcing
+
+    selinux_policy: targeted
+
+    selinux_booleans:
+      - name: httpd_can_network_connect
+        state: true
+        persistent: true
+
+    selinux_fcontexts:
+      - target: '/www(/.*)?'
+        setype: httpd_sys_content_t
+        state: present
+
+    selinux_ports:
+      - ports: 8888
+        proto: tcp
+        setype: http_port_t
+        state: present
+
+  tasks:
+
+    # --------------------------------------------------
+    # 1. WEB 패키지 설치
+    # --------------------------------------------------
+    - name: WEB 패키지 설치
+      ansible.builtin.dnf:
+        name:
+          - httpd
+          - mod_ssl
+          - firewalld
+        state: present
+
+    # --------------------------------------------------
+    # 2. WEB 서비스 설정 - httpd.conf
+    # --------------------------------------------------
+    - name: WEB 서비스 설정 - httpd.conf
+      ansible.builtin.copy:
+        src: /home/ansible/ansible/10_selinux/files/httpd.conf
+        dest: /etc/httpd/conf/httpd.conf
+        owner: root
+        group: root
+        mode: '0644'
+
+    # --------------------------------------------------
+    # 3. WEB 디렉토리 생성
+    # --------------------------------------------------
+    - name: WEB 디렉토리 생성 - /www
+      ansible.builtin.file:
+        path: /www
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    # --------------------------------------------------
+    # 4. WEB 서비스 설정 - index.html
+    # --------------------------------------------------
+    - name: WEB 서비스 설정 - index.html
+      ansible.builtin.copy:
+        src: /home/ansible/ansible/10_selinux/files/index.html
+        dest: /www/index.html
+        owner: root
+        group: root
+        mode: '0644'
+
+    # --------------------------------------------------
+    # 5. RHEL System Role - SELinux
+    # --------------------------------------------------
+    - name: SELinux 설정
+      ansible.builtin.include_role:
+        name: rhel-system-roles.selinux
+
+    # --------------------------------------------------
+    # 6. WEB 서비스 시작
+    # --------------------------------------------------
+    - name: WEB 서비스 시작 및 부팅 시 자동 시작 설정
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+      loop:
+        - httpd
+        - firewalld
+
+    # --------------------------------------------------
+    # 7. 방화벽 설정
+    # --------------------------------------------------
+    - name: 방화벽 설정 - http 서비스 허용
+      ansible.posix.firewalld:
+        port: 8888/tcp
+        permanent: true
+        immediate: true
+        state: enabled
+

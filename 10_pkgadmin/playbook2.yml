@@ -1,0 +1,43 @@
+---
+################################
+# 1. 레포지토리 구성
+#   * http://192.168.10.10/repo
+# 2. 패키지 설치
+#   * bsc, msmsms
+################################
+- name: 레포지토리 구성
+  hosts: servers
+  vars:
+    pkg_bsc: bsc
+    pkg_ms: msmsms
+  tasks:
+    - name: 0) package_facts 팩트 정보 수집
+      ansible.builtin.package_facts:
+        manager: auto
+
+    - name: 0) package_facts 내용 확인
+      ansible.builtin.debug:
+        msg: "[ OK ] 패키지 존재"
+      when:
+        - pkg_bsc in ansible_facts["packages"]
+        - pkg_ms in ansible_facts["packages"]
+
+    - name: 1) 레포지토리 구성
+      ansible.builtin.yum_repository:
+        file: example
+        name: examplerepo
+        description: Example Repo
+        baseurl: http://192.168.10.10/repo
+        gpgcheck: true
+
+    - name: GPG Key 가져오기
+      ansible.builtin.rpm_key:
+        state: present
+        key: http://192.168.10.10/repo/RPM-GPG-KEY-test
+
+    - name: 2) 패키지 설치
+      ansible.builtin.dnf:
+        name:
+          - msmsms
+          - bsc
+        state: present

@@ -1,0 +1,32 @@
+---
+- name: 레포지토리 구성 원복
+  hosts: servers
+  become: true
+  vars:
+    custom_pkg1: bsc
+    custom_pkg2: msmsms
+  tasks:
+    # 1. 설치된 사용자 패키지 삭제 (가장 먼저 실행)
+    - name: 추가된 패키지 삭제
+      ansible.builtin.dnf:
+        name:
+          - "{{ custom_pkg1 }}"
+          - "{{ custom_pkg2 }}"
+        state: absent
+    # 2. 등록된 RPM GPG 키 제거
+    - name: GPG 키 제거
+      ansible.builtin.rpm_key:
+        key: http://192.168.10.10/repo/RPM-GPG-KEY-test
+        state: absent
+      ignore_errors: true
+    # 3. 구성된 YUM 리포지토리 파일(.repo) 삭제
+    - name: RPM Repo 구성 제거
+      ansible.builtin.yum_repository:
+        file: example        # 기존에 생성한 파일명 (example.repo)
+        name: examplerepo    # 기존에 생성한 섹션 이름 ([examplerepo])
+        state: absent
+    # 4. dnf 캐시 정리 (리포지토리 정보 갱신)
+    - name: DNF 캐시 비우기
+      ansible.builtin.command:
+        cmd: dnf clean all
+      changed_when: true

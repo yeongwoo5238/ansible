@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: MIT
+---
+__sudo_sudoers_config: /etc/sudoers
+__sudo_packages: sudo
+__sudo_services: []
+__sudo_required_facts:
+  - distribution
+  - distribution_major_version
+  - distribution_version
+  - os_family
+__sudo_required_facts_subsets: "{{ ['!all', '!min'] + __sudo_required_facts }}"
+
+__sudo_write_log_file: false
+
+# BEGIN - DO NOT EDIT THIS BLOCK - rh distros variables
+# Ansible distribution identifiers that the role treats like RHEL
+__sudo_rh_distros:
+  - AlmaLinux
+  - CentOS
+  - RedHat
+  - Rocky
+
+# Same as above but includes Fedora
+__sudo_rh_distros_fedora: "{{ __sudo_rh_distros + ['Fedora'] }}"
+
+# Use this in conditionals to check if distro is Red Hat or clone
+__sudo_is_rh_distro: "{{ ansible_facts['distribution'] in __sudo_rh_distros }}"
+
+# Use this in conditionals to check if distro is Red Hat or clone, or Fedora
+__sudo_is_rh_distro_fedora: "{{ ansible_facts['distribution'] in __sudo_rh_distros_fedora }}"
+
+# Use these in conditionals to check if distro is Red Hat or clone of a specific major version
+__sudo_is_rh_distro_7: "{{ __sudo_is_rh_distro and ansible_facts['distribution_major_version'] == '7' }}"
+__sudo_is_rh_distro_8: "{{ __sudo_is_rh_distro and ansible_facts['distribution_major_version'] == '8' }}"
+__sudo_is_rh_distro_9: "{{ __sudo_is_rh_distro and ansible_facts['distribution_major_version'] == '9' }}"
+__sudo_is_rh_distro_10: "{{ __sudo_is_rh_distro and ansible_facts['distribution_major_version'] == '10' }}"
+# END - DO NOT EDIT THIS BLOCK - rh distros variables

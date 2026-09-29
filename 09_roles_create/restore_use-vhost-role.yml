@@ -1,0 +1,11 @@
+- name: Restore use-vhost-role.yml
+  hosts: all
+  tasks:
+    - name: Restore Tasks
+      ansible.builtin.include_role:
+        name: rollbacksvc
+
+      vars:
+        myfiles:
+          - /var/www/html/index.html
+

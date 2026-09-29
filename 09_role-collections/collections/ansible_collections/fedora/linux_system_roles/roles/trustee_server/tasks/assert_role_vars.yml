@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MIT
+---
+- name: Assert trustee_server_secret_registration_listen_port is within valid range
+  ansible.builtin.assert:
+    that:
+      - trustee_server_secret_registration_listen_port | int >= 1
+      - trustee_server_secret_registration_listen_port | int <= 65535
+    fail_msg: >-
+      trustee_server_secret_registration_listen_port must be between
+      1 and 65535 inclusive,
+      got {{ trustee_server_secret_registration_listen_port }}
+      ({{ trustee_server_secret_registration_listen_port | type_debug }})

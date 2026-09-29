@@ -1,0 +1,54 @@
+---
+- name: Manage SELinux policy example
+  hosts: all
+  vars:
+    selinux_policy: targeted
+    selinux_state: enforcing
+    selinux_booleans:
+      - name: httpd_can_network_connect
+        state: true
+        persistent: true
+    selinux_fcontexts:
+      - target: '/web(/.*)?'
+        setype: httpd_sys_content_t
+        ftype: a
+        state: present
+    selinux_restore_dirs:
+      - /web
+    selinux_ports:
+      - ports: 8080
+        proto: tcp
+        setype: http_port_t
+        state: present
+  tasks:
+    - name: Creates directory
+      ansible.builtin.file:
+        path: /web
+        state: directory
+        mode: "0755"
+
+    - name: Create index.html
+      ansible.builtin.copy:
+        content: "Hello Linux!"
+        dest: /web/index.html
+
+    - name: Execute the role and reboot in a rescue block
+      block:
+        - name: Include selinux role
+          ansible.builtin.include_role:
+            name: redhat.rhel_system_roles.selinux
+      rescue:
+        - name: >-
+            Fail if failed for a different reason than selinux_reboot_required
+          ansible.builtin.fail:
+            msg: "role failed"
+          #when: not selinux_reboot_required
+          when: not (selinux_reboot_required | default(false))
+
+        - name: Restart managed host
+          ansible.builtin.reboot:
+            reboot_timeout: 600
+
+        - name: Reapply the role
+          include_role:
+            name: redhat.rhel_system_roles.selinux

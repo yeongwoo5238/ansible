@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: MIT
+---
+- name: Set ansible_facts required by role
+  include_tasks: set_vars.yml
+
+- name: Handle insights unregistration
+  include_tasks: insights-client-unregistration.yml
+  when:
+    - ansible_facts['distribution'] == "RedHat"
+    - >-
+      rhc_insights.state | d("present") == "absent"
+      or rhc_state | d("present") in ["absent", "reconnect"]
+    - '"insights-client" in ansible_facts.packages'
+
+- name: Handle system subscription
+  include_tasks: subscription-manager.yml
+
+- name: Handle insights registration
+  include_tasks: insights-client.yml
+  when:
+    - ansible_facts['distribution'] == "RedHat"
+    - rhc_insights.state | d("present") == "present"
+    - rhc_state | d("present") in ["present", "reconnect"]
+
+- name: Record role success fingerprint
+  fedora.linux_system_roles.sr_fingerprint:
+    status: success
+    role_name: rhc
+    role_path: "{{ role_path }}"
+    ansible_play_hosts_all: "{{ ansible_play_hosts_all }}"
+    distribution: "{{ ansible_facts['distribution'] }}"
+    distribution_version: "{{ ansible_facts['distribution_version'] }}"
+    write_log_file: "{{ __rhc_write_log_file }}"

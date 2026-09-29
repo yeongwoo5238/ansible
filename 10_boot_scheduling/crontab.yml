@@ -1,0 +1,26 @@
+---
+####################################################
+# 작업 요구 사항:
+# 요구사항:
+# * CMD: date >> /tmp/mydate.txt
+# * 작업: devops 사용자가 월요일부터 금요일까지 5분마다 
+#   실행하도록 cron 작업을 구성한다
+####################################################
+- name: Cron 작업 구성
+  hosts: webservers
+  become: true
+  tasks:
+    - name: Crontab 작업 추가
+      ansible.builtin.cron:
+        # cat /etc/cron.d/add-date-file
+        # => */5 * * * 1-5 devops date >> /tmp/mydate.txt
+        name: "나의 cron 작업이당"
+        job: date >> /tmp/mydate.txt
+        user: devops
+        minute: "*/5"
+        hour: "*"
+        day: "*"
+        month: "*"
+        weekday: 1-5
+        cron_file: add-date-file
+        state: present

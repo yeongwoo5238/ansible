@@ -1,0 +1,41 @@
+---
+##################################################################
+# 작업 요구 사항 분석:
+# ● PV 이름: /dev/nvme0n2
+# ● VG 이름: webvg
+# ● LV: weblv(512 MiB), loglv(나머지)
+# ● FS: weblv(ext4), loglv(xfs)
+# ● Mount: weblv(ext4) --> /var/www, loglv(xfs) --> /var/log/httpd
+##################################################################
+- name: RHEL 시스템 역할을 사용한 스토리지 작업
+  hosts: servers
+  tasks: 
+    - name: 선수조건1 - 디스크 존재 유무 확인
+      ansible.builtin.debug:
+        msg: '[ FAIL ] /dev/nvme0n2 디스크가 존재하지 않습니다.'
+      failed_when: ansible_facts['devices']['nvme0n2'] is not defined
+
+    - name: 스토리지 작업
+      ansible.builtin.include_role:
+        name: redhat.rhel_system_roles.storage
+      vars:
+        storage_pools:
+          - name: webvg
+            type: lvm
+            disks:
+              - /dev/nvme0n2
+            state: absent
+            volumes:
+              - name: weblv
+                size: "400 MiB"
+                mount_point: "/var/www"
+                fs_type: ext4
+                state: absent
+              - name: loglv
+                size: "400m"
+                mount_point: "/var/log/httpd"
+                fs_type: xfs
+                state: absent
+ 
+    -
+    -

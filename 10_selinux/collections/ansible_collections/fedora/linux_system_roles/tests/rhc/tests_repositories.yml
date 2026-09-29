@@ -1,0 +1,154 @@
+# SPDX-License-Identifier: MIT
+---
+- name: Basic repository enablement/disablement test
+  hosts: all
+  become: true
+  tags:
+    - tests::slow
+  tasks:
+    - name: See if /dev/log exists for the fingerprint check
+      ansible.builtin.stat:
+        path: /dev/log
+      register: __register_dev_log
+
+    - name: Set the start time for the journal search
+      ansible.builtin.set_fact:
+        __journal_start_time: "{{ ansible_facts['date_time']['date'] ~ ' ' ~ ansible_facts['date_time']['time'] }}"
+      when: __register_dev_log.stat.exists
+
+    - name: Test repositories
+      block:
+        - name: Setup Candlepin
+          import_tasks: tasks/setup_candlepin.yml
+
+        - name: Register
+          include_tasks: tasks/run_role_with_clear_facts.yml
+          vars:
+            __rhc_write_log_file: true
+            rhc_auth:
+              login:
+                username: "{{ lsr_rhc_test_data.reg_username }}"
+                password: "{{ lsr_rhc_test_data.reg_password }}"
+            rhc_insights:
+              state: absent
+            rhc_organization: "{{ lsr_rhc_test_data.reg_organization }}"
+            rhc_server:
+              hostname: "{{ lsr_rhc_test_data.candlepin_host }}"
+              port: "{{ lsr_rhc_test_data.candlepin_port }}"
+              prefix: "{{ lsr_rhc_test_data.candlepin_prefix }}"
+              insecure: "{{ lsr_rhc_test_data.candlepin_insecure }}"
+            rhc_baseurl: "{{ lsr_rhc_test_data.baseurl | d(omit) }}"
+            rhc_repositories: "{{ lsr_rhc_test_data.repositories }}"
+            rhc_proxy: "{{ rhc_external_proxy | default({}) }}"
+
+        - name: Get fingerprint entries from journal
+          ansible.builtin.shell:
+            executable: /bin/bash
+            cmd: >-
+              set -eo pipefail;
+              journalctl --since "{{ __journal_start_time }}" --no-pager |
+              grep -v " Invoked with" |
+              grep "sr_fingerprint.*role_name=rhc"
+          register: __register_journal_fingerprints
+          changed_when: false
+          when: __register_dev_log.stat.exists
+
+        - name: Check that the log file was written
+          ansible.builtin.slurp:
+            path: /var/log/sysroles.jsonl
+          register: __register_log_file
+
+        - name: Verify log file and journal fingerprints
+          when: __register_dev_log.stat.exists
+          vars:
+            __journal_lines: "{{ __register_journal_fingerprints.stdout_lines }}"
+            __journal_begin: "{{ __journal_lines | select('search', 'status=begin') | list }}"
+            __journal_success: "{{ __journal_lines | select('search', 'status=success') | list }}"
+            __begin_date: "{{ (__journal_begin[0] | regex_search('date=([^ ]+)', '\\1'))[0] }}"
+            __success_date: "{{ (__journal_success[0] | regex_search('date=([^ ]+)', '\\1'))[0] }}"
+            __file_content: "{{ __register_log_file.content | b64decode }}"
+          block:
+            - name: Print contents of logs
+              debug:
+                var: item
+              loop:
+                - "{{ __file_content }}"
+                - "{{ __journal_lines }}"
+
+            - name: Assert content is correct
+              ansible.builtin.assert:
+                that:
+                  - __journal_begin | length > 0
+                  - __journal_success | length > 0
+                  - __begin_date in __file_content
+                  - __success_date in __file_content
+
+        - name: Get enabled repositories
+          include_tasks: tasks/list_repositories.yml
+          vars:
+            mode: list-enabled
+
+        - name: Check repositories to enable are enabled
+          assert:
+            that:
+              - item.name in test_repositories.stdout_lines
+          when: item.state | d("enabled") == "enabled"
+          loop: "{{ lsr_rhc_test_data.repositories }}"
+
+        - name: Get disabled repositories
+          include_tasks: tasks/list_repositories.yml
+          vars:
+            mode: list-disabled
+
+        - name: Check repositories to disable are disabled
+          assert:
+            that:
+              - item.name in test_repositories.stdout_lines
+          when: item.state | d("enabled") == "disabled"
+          loop: "{{ lsr_rhc_test_data.repositories }}"
+
+        - name: Disable all the repositories
+          include_tasks: tasks/run_role_with_clear_facts.yml
+          vars:
+            rhc_insights:
+              state: absent
+            rhc_repositories:
+              - {name: "*", state: disabled}
+
+        - name: Get enabled repositories
+          include_tasks: tasks/list_repositories.yml
+          vars:
+            mode: list-enabled
+
+        - name: Check there are no repositories enabled
+          assert:
+            that:
+              - test_repositories.stdout_lines | length == 0
+
+        - name: Enable repo on already registered system
+          include_tasks: tasks/run_role_with_clear_facts.yml
+          vars:
+            rhc_insights:
+              state: absent
+            rhc_repositories:
+              - "{{ lsr_rhc_test_data.repositories.0 }}"
+
+        - name: Get enabled repositories
+          include_tasks: tasks/list_repositories.yml
+          vars:
+            mode: list-enabled
+
+        - name: Verify that repository is enabled
+          assert:
+            that: >
+              lsr_rhc_test_data.repositories.0.name in
+              test_repositories.stdout_lines
+
+      always:
+        - name: Unregister
+          include_tasks: tasks/run_role_with_clear_facts.yml
+          vars:
+            rhc_state: absent
+
+        - name: Clean up Candlepin container
+          include_tasks: tasks/teardown_candlepin.yml

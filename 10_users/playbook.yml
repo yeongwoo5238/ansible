@@ -1,0 +1,55 @@
+---
+################################
+# 작업 대상 서버: web3
+# * webadmin 그룹 생성
+# * user1 ~ user5 사용자 생성 + 부 그룹(webadmin)
+#   - 공개키 인증  - sudo CMD 사용
+# * root 원격 [암호 인증 방식] 로그인 방지
+################################
+- name: 다중 사용자 생성 및 설정
+  hosts: webservers
+  vars_files:
+    - vars/users_vars.yml
+  tasks:
+    - name: "1) webadmin 그룹 생성"
+      ansible.builtin.group:
+        name: webadmin
+        state: present
+
+    - name: "2) 사용자 생성 및 설정"
+      ansible.builtin.user:
+        name: "{{ item['username'] }}"
+        groups: "{{ item['groups'] }}"
+        state: present
+      loop: "{{ users }}"
+
+    - name: "3) 사용자 공개키 인증 설정"
+      ansible.builtin.authorized_key:
+        user: "{{ item['username'] }}"
+        state: present
+        key: "{{ lookup('file', 'files/' + item['username'] + '.pub') }}"
+      loop: "{{ users }}"
+
+    - name: "4) sudoers 파일 설정"
+      ansible.builtin.lineinfile:
+        path: "/etc/sudoers.d/webadmin"
+        line: "%webadmin ALL=(ALL) NOPASSWD: ALL"
+        owner: root
+        group: root
+        mode: '0440'
+        create: true
+        validate: '/usr/sbin/visudo -cf %s'
+
+    - name: "5) root 원격 로그인 방지"
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^PermitRootLogin'
+        line: 'PermitRootLogin prohibit-password'
+      notify:
+        - Restart SSH
+
+  handlers:
+    - name: Restart SSH
+      ansible.builtin.service:
+       name: sshd
+       state: restarted

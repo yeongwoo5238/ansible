@@ -1,0 +1,14 @@
+---
+- name: 네트워크 정보 확인
+  hosts: servers
+  tasks:
+    - name: 네트워크 설정 확인 및 설정
+      block:
+        - name: 네트워크 정보 확인
+          ansible.builtin.debug:
+            var: ansible_facts['ens224']
+
+        - name: 네트워크 설정
+          ansible.builtin.include_role:
+            name: redhat.rhel_system_roles.network
+      when: ansible_facts['ens224'] is defined

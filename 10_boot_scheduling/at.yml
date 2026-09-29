@@ -1,0 +1,21 @@
+---
+######################################################
+# at 작업 요구 사항:
+# 요구사항:
+# * CMD: date >> ~/myat.txt
+# * 작업: 
+#   - 향후 1분 뒤에 devops 사용자로 실행되는 작업 스케줄링을 진행한다.
+#   - 작업이 존재하는 경우 다시 등록되지 않도록 한다.
+######################################################
+- name: at 작업 구성
+  hosts: webservers
+  become: true
+  become_user: devops
+  tasks:
+    - name: at 작업 추가
+      ansible.builtin.at:
+        command: date > /tmp/myat.txt
+        count: 1
+        units: minutes
+        unique: true
+        state: present

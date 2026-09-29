@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: MIT
+---
+- name: Set per-container image variables
+  set_fact:
+    __podman_kube_images: "{{ (__images + __init_images) | unique | list }}"
+  vars:
+    __images: "{{ __podman_kube_parsed.kube_yamls | selectattr('spec', 'defined') | map(attribute='spec') | selectattr('containers', 'defined') | map(attribute='containers') | flatten | selectattr('image', 'defined') | map(attribute='image') | list if __podman_kube_parsed.kube_yamls else [] }}"
+    __init_images: "{{ __podman_kube_parsed.kube_yamls | selectattr('spec', 'defined') | map(attribute='spec') | selectattr('initContainers', 'defined') | map(attribute='initContainers') | flatten | selectattr('image', 'defined') | map(attribute='image') | list if __podman_kube_parsed.kube_yamls else [] }}"
+
+- name: Check user and group information
+  include_tasks: handle_user_group.yml
+  vars:
+    __podman_handle_user: "{{ __podman_kube_parsed.user }}"
+    __podman_spec_item:
+      run_as_group: "{{ __podman_kube_parsed.run_as_group }}"
+
+- name: Fail if no kube spec is given
+  fail:
+    msg: >
+      One of kube_file, kube_file_src, or kube_file_content must
+      be given
+  when:
+    - __podman_kube_parsed.kube_yamls | length == 0
+    - __podman_kube_parsed.kube_file_field is none or __podman_kube_parsed.kube_file_field | length == 0
+
+- name: Cleanup containers and services
+  include_tasks: cleanup_kube_spec.yml
+  when: __podman_kube_parsed.state == "absent"
+
+- name: Create and update containers and services
+  include_tasks: create_update_kube_spec.yml
+  when: __podman_kube_parsed.state != "absent"
+  no_log: "{{ podman_secure_logging }}"

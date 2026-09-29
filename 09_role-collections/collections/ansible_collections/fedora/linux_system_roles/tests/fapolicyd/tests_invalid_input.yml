@@ -1,0 +1,223 @@
+# SPDX-License-Identifier: MIT
+---
+- name: Verify invalid parameters are rejected
+  hosts: all
+  tasks:
+    - name: Run invalid input tests
+      block:
+      # ====================================================
+      # Section 1: Verify role works with valid defaults
+      # ====================================================
+        - name: Run role with valid defaults
+          ansible.builtin.include_role:
+            name: fedora.linux_system_roles.fapolicyd
+
+      # ====================================================
+      # Section 2: argument_specs validation (Ansible 2.10+)
+      # ====================================================
+        - name: Run argument specs validation tests
+          when: ansible_version.full is version("2.10", ">=")
+          block:
+          # --- Test: non-boolean fapolicyd_setup_enable_service ---
+            - name: Argument specs reject non-bool enable_service
+              block:
+                - name: Run role with non-bool enable_service
+                  ansible.builtin.include_role:
+                    name: fedora.linux_system_roles.fapolicyd
+                  vars:
+                    fapolicyd_setup_enable_service: "not_a_bool"
+              rescue:
+                - name: Mark invalid enable_service type rejected
+                  ansible.builtin.set_fact:
+                    __invalid_input_enable_service_type_failed: true
+
+            - name: Assert invalid enable_service type was rejected
+              ansible.builtin.assert:
+                that:
+                  - >-
+                    __invalid_input_enable_service_type_failed
+                    | default(false)
+                fail_msg: >-
+                  argument_specs should reject fapolicyd_setup_enable_service
+                  with a non-boolean value
+
+          # --- Test: invalid fapolicyd_setup_integrity choice ---
+            - name: Argument specs reject invalid integrity choice
+              block:
+                - name: Run role with invalid integrity value
+                  ansible.builtin.include_role:
+                    name: fedora.linux_system_roles.fapolicyd
+                  vars:
+                    fapolicyd_setup_integrity: invalid_integrity
+              rescue:
+                - name: Mark invalid integrity choice rejected
+                  ansible.builtin.set_fact:
+                    __invalid_input_integrity_choice_failed: true
+
+            - name: Assert invalid integrity choice was rejected
+              ansible.builtin.assert:
+                that:
+                  - >-
+                    __invalid_input_integrity_choice_failed
+                    | default(false)
+                fail_msg: >-
+                  argument_specs should reject fapolicyd_setup_integrity
+                  with an invalid choice value
+
+          # --- Test: non-boolean fapolicyd_setup_permissive ---
+            - name: Argument specs reject non-bool permissive
+              block:
+                - name: Run role with non-bool permissive
+                  ansible.builtin.include_role:
+                    name: fedora.linux_system_roles.fapolicyd
+                  vars:
+                    fapolicyd_setup_permissive: "not_a_bool"
+              rescue:
+                - name: Mark invalid permissive type rejected
+                  ansible.builtin.set_fact:
+                    __invalid_input_permissive_type_failed: true
+
+            - name: Assert invalid permissive type was rejected
+              ansible.builtin.assert:
+                that:
+                  - >-
+                    __invalid_input_permissive_type_failed
+                    | default(false)
+                fail_msg: >-
+                  argument_specs should reject fapolicyd_setup_permissive
+                  with a non-boolean value
+
+      # ====================================================
+      # Section 3: assert_role_vars validation (all versions)
+      # ====================================================
+
+      # --- Test: fapolicyd_add_trusted_file as integer ---
+        - name: Assert rejects trusted_file as integer
+          block:
+            - name: Run role with integer trusted_file
+              ansible.builtin.include_role:
+                name: fedora.linux_system_roles.fapolicyd
+              vars:
+                fapolicyd_add_trusted_file: 123
+          rescue:
+            - name: Mark trusted_file integer rejected
+              ansible.builtin.set_fact:
+                __invalid_input_trusted_file_int_failed: true
+
+        - name: Assert trusted_file as integer was rejected
+          ansible.builtin.assert:
+            that:
+              - >-
+                __invalid_input_trusted_file_int_failed
+                | default(false)
+            fail_msg: >-
+              assert_role_vars should reject fapolicyd_add_trusted_file
+              when given an integer value
+
+      # --- Test: fapolicyd_add_trusted_paths as integer ---
+        - name: Assert rejects trusted_paths as integer
+          block:
+            - name: Run role with integer trusted_paths
+              ansible.builtin.include_role:
+                name: fedora.linux_system_roles.fapolicyd
+              vars:
+                fapolicyd_add_trusted_paths: 123
+          rescue:
+            - name: Mark trusted_paths integer rejected
+              ansible.builtin.set_fact:
+                __invalid_input_trusted_paths_int_failed: true
+
+        - name: Assert trusted_paths as integer was rejected
+          ansible.builtin.assert:
+            that:
+              - >-
+                __invalid_input_trusted_paths_int_failed
+                | default(false)
+            fail_msg: >-
+              assert_role_vars should reject fapolicyd_add_trusted_paths
+              when given an integer value
+
+      # --- Test: fapolicyd_add_trusted_file as list of non-strings ---
+        - name: Assert rejects trusted_file as list of non-strings
+          block:
+            - name: Run role with list of integers for trusted_file
+              ansible.builtin.include_role:
+                name: fedora.linux_system_roles.fapolicyd
+              vars:
+                fapolicyd_add_trusted_file:
+                  - 123
+                  - 456
+          rescue:
+            - name: Mark trusted_file non-string list rejected
+              ansible.builtin.set_fact:
+                __invalid_input_trusted_file_list_failed: true
+
+        - name: Assert trusted_file as list of non-strings was rejected
+          ansible.builtin.assert:
+            that:
+              - >-
+                __invalid_input_trusted_file_list_failed
+                | default(false)
+            fail_msg: >-
+              assert_role_vars should reject fapolicyd_add_trusted_file
+              when given a list containing non-string elements
+
+      # --- Test: fapolicyd_add_trusted_file as dict ---
+        - name: Assert rejects trusted_file as dict
+          block:
+            - name: Run role with dict for trusted_file
+              ansible.builtin.include_role:
+                name: fedora.linux_system_roles.fapolicyd
+              vars:
+                fapolicyd_add_trusted_file:
+                  key: val
+          rescue:
+            - name: Mark trusted_file dict rejected
+              ansible.builtin.set_fact:
+                __invalid_input_trusted_file_dict_failed: true
+
+        - name: Assert trusted_file as dict was rejected
+          ansible.builtin.assert:
+            that:
+              - >-
+                __invalid_input_trusted_file_dict_failed
+                | default(false)
+            fail_msg: >-
+              assert_role_vars should reject fapolicyd_add_trusted_file
+              when given a dictionary value
+
+      # --- Test: fapolicyd_add_trusted_file as boolean ---
+        - name: Assert rejects trusted_file as boolean
+          block:
+            - name: Run role with boolean for trusted_file
+              ansible.builtin.include_role:
+                name: fedora.linux_system_roles.fapolicyd
+              vars:
+                fapolicyd_add_trusted_file: true
+          rescue:
+            - name: Mark trusted_file boolean rejected
+              ansible.builtin.set_fact:
+                __invalid_input_trusted_file_bool_failed: true
+
+        - name: Assert trusted_file as boolean was rejected
+          ansible.builtin.assert:
+            that:
+              - >-
+                __invalid_input_trusted_file_bool_failed
+                | default(false)
+            fail_msg: >-
+              assert_role_vars should reject fapolicyd_add_trusted_file
+              when given a boolean value
+
+      always:
+        - name: Clear test facts
+          ansible.builtin.set_fact:
+            __invalid_input_enable_service_type_failed: null
+            __invalid_input_integrity_choice_failed: null
+            __invalid_input_permissive_type_failed: null
+            __invalid_input_trusted_file_int_failed: null
+            __invalid_input_trusted_paths_int_failed: null
+            __invalid_input_trusted_file_list_failed: null
+            __invalid_input_trusted_file_dict_failed: null
+            __invalid_input_trusted_file_bool_failed: null
+          tags: tests::cleanup
